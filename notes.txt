@@ -1,0 +1,76 @@
+The 3 systems:
+    1. latitude/longitude as we know them. Defining a point on earth itself. A given point spins with the earth.  
+    2. right ascension/declination. Defining a point which is stuck to a sphere where earth is but which does not spin. Once a day, the gridlines of right ascension will line up with longitude, and declination with latitude.  
+    3. ecliptic latitude/longitude. Used to define points on a sphere that doesn't spin, and is rotated so that the sun is always at its "equator" 
+
+Equitorial Coordinate System
+ (2 above)
+    - RA zero is vernal equinox, like 0 longitiude is Greenwich meridian
+        - http://www.stargazing.net/kepler/ellipse.html#twig06
+    
+
+
+Stars:
+- dont need to mess with ecliptic
+- get database of RA and DEC for stars
+    - http://tdc-www.harvard.edu/catalogs/bsc5.html
+- Another database
+    - https://www.astronexus.com/hyg
+  
+
+Convert to altitude and azimuth in the app
+https://people.ast.cam.ac.uk/~ioalib/convert.html
+
+https://www.aa.quae.nl/en/reken/zonpositie.html
+
+Moon
+- use previously created lib
+
+Sun
+- use previously created lib
+
+Planets
+- http://www.stargazing.net/kepler/ellipse.html#twig06
+
+ 
+Sphere Image
+    - get location from GPS
+    - get current time
+    - get current phone orientation 
+
+
+    - Stars
+        - old system computes users location from 
+            - an observed altitude and azimuth of an object
+            - the location of a celestial object over earth in equitorial coordinates (lat/long)
+            - the parallax angle
+
+        - given lat/long of current user
+        - compute alt/az of a given object (star for now)
+        
+
+
+- Stellar Parallax
+    - varies with location of earth through year
+    - https://www2.jpl.nasa.gov/teachers/attachments/parallax.html#:~:text=The%20Parallax%20Angle%20%2D%2D%20How,the%20Earth%20to%20that%20star.
+    - is the angle at the star on a triangle formed between the star and the location of earth at two places along its orbit, the locations are 6 months apart and equidistant from the star
+    - proxima centauri has largest parallax angle of  0.7687 ± 0.0003 arcsec
+    - can ignore stellar parallax as phone sensors will have much more noise so wont be able to discern difference
+
+- Diurnal Parallax
+    - varies with location on the earth
+    - Lunar
+        http://www.etwright.org/astro/moonpar.html
+        https://www.eso.org/public/outreach/eduoff/vt-2004/Background/Infol2/EIS-G4.html
+        - max around 1 degree of arc
+    
+ 
+    
+        
+    
+
+
+
+
+
+

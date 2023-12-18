@@ -23,8 +23,6 @@ const sin = (deg) => Math.sin(rad(deg)),
 
 
 
-
-
 const EARTH_RADIUS_KM = 6378.14
 
 // Originally from most recent Astronomical Almanac, at least 1999-2015
@@ -37,22 +35,10 @@ export class Moon {
         const t = toJulianCenturies(jd)
         const eclipLongBase = Moon.eclipticLongBase(t)
         const eclipLatBase = Moon.eclipticLatBase(t)
-        //const [eclipLat, eclipLong] = Moon.precessionCorrection(t, eclipLatBase, eclipLongBase)
         return {
             long: eclipLongBase,
             lat: eclipLatBase
         }
-    }
-
-    static horizontalParallaxJd(jd) {
-        const t = toJulianCenturies(jd)
-        return Moon.horizontalParallax(t)
-    }
-
-    static distance(jd) {
-        const t = toJulianCenturies(jd)
-        const theta = Moon.horizontalParallax(t)
-        return EARTH_RADIUS_KM / sin(theta)
     }
 
     // t in julian centuries
@@ -74,27 +60,6 @@ export class Moon {
             [-0.17, -407332.21, 217.6]
         ]
         return sum(sinConstants.map(([a, b, c]) => a * sin(b * t + c)))
-    }
-
-    static horizontalParallax(t) {
-        const cosConstants = [
-            [0.0518,    477198.85,  134.9],
-            [0.0095,    -413335.38, 259.2],
-            [0.0078,    890534.23,  235.7],
-            [0.0028,    954397.7,   269.9]
-        ] 
-
-        return 0.9508 + sum(cosConstants.map(([a, b, c]) => a * cos(b * t + c)))
-    }
-
-    static precessionCorrection(t, lat, long) {
-        const a = 1.396971 * t + 0.0003086 * t * t
-        const b = 0.013056 * t - 0.0000092 * t * t
-        const c = 5.12362 - 1.155358 * t - 0.0001964 * t * t
-
-        const latPre = lat - b * sin(long + c)
-        const longPre = long - a + b * cos(long + c) * tan(latPre)
-        return [latPre, longPre]
     }
 }
 
@@ -299,20 +264,12 @@ function getPosition() {
 const userLoc = await getPosition()
 const userLatLong = { lat: userLoc.coords.latitude, long: userLoc.coords.longitude }
 
-
 const stars = await fetch('./data/stars_vis.json').then(response => response.json())
+const planets = await fetch('./data/planets.json').then(response => response.json())
+const earth = planets.filter((p) => p.name === "Earth")[0]
 
-/*const stars = [
-    { name: 'red', mag: 0, dec: 90, ra: 0 }, // np
-    { name: 'green', mag: 0, dec: -90, ra: 0 }, //sp
-    { name: 'blue', mag: 0, dec: 0, ra: 0 },        //vernal
-    { name: 'yellow', mag: 0, dec: 0, ra: 12 }, // op vernal
-    { name: 'orange', mag: 0, dec: 0, ra: 6 }, 
-    { name: 'purple', mag: 0, dec: 0, ra: 18 } 
-]*/
 
 const EARTH_OBLIQUITY = 23.4393 // epsilon
-
 
 function rightAscension(eclip) {
     const l = cos(eclip.lat) * cos(eclip.long)
@@ -336,8 +293,61 @@ function eclipticToEquitorial(eclipLatLong, jd) {
 }
 
 
+// degrees, long is [0, 360] west
+// https://www.aa.quae.nl/en/reken/zonpositie.html
+function sunEclipLatLong(JD) {
+    // mean anomaly
+    const M = (357.5291 + 0.98560028 * (JD - j2000jd)) % 360
 
-console.log(stars)
+    // equation of center
+    const C = 1.9148 * sin(M) + 0.02 * sin(2 * M) + 0.0003 * sin(3 * M)
+
+    // Perihelion and the Obliquity of the Ecliptic
+    const eclipticLongPeri = 102.9373 // perihelion of the earth, relative to the ecliptic and vernal equinox
+
+    // mean ecliptic long
+    const L = M + eclipticLongPeri
+
+    // ecliptic long - 180 for the earth
+    const lambda = L + C + 180
+    const b = 0 // ecliptic lat - divergence of sun from ecliptic is alway 0
+
+    // right ascension and declination
+    return {
+        long: lambda,
+        lat: b
+    }
+}
+
+
+function rectHelioEcliptical(jd, p) {
+    const d = jd
+    const d0 = j2000jd
+    const M = (p.M0 + p.n * (d - d0)) % 360 // TODO should be mod 360?
+    const C = p.C1 * sin(M) + p.C2 * sin(2 * M) + p.C3 * sin(3 * M) * p.C4 * sin(4 * M) + p.C5 * sin(5 * M) + p.C6 * sin(6 * M)
+    const nu = (M + C) % 360
+    const r = p.a * (1 - p.e*p.e) / (1 + p.e * cos(nu))
+
+    const x = r * (cos(p.OMEGA) * cos(p.omega + nu) - sin(p.OMEGA) * cos(p.i) * sin(p.omega + nu))
+    const y = r * (sin(p.OMEGA) * cos(p.omega + nu) + cos(p.OMEGA) * cos(p.i) * sin(p.omega + nu))
+    const z = r * sin(p.i) * sin(p.omega + nu)
+    return [x, y, z]    
+}
+
+function planetEclipLatLong(jd, p, earth) {
+    const [xp, yp, zp] = rectHelioEcliptical(jd, p) 
+    const [xe, ye, ze] = rectHelioEcliptical(jd, earth) 
+    const x = xp - xe
+    const y = yp - ye
+    const z = zp - ze
+    const delta = Math.sqrt(x*x + y*y + z*z)
+    const lambda = atan2(y, x)
+    const beta = asin(z/delta)
+    console.log(p.name, x, y, z, delta, lambda, beta)
+    return { long: lambda, lat: beta } 
+}
+
+
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
@@ -398,7 +408,28 @@ function drawMoon(xCanvas, yCanvas) {
     ctx.fill();
 }
 
-const options = { frequency: 30, referenceFrame: "device" };
+function drawPlanet(p, xCanvas, yCanvas) {
+    ctx.beginPath();
+    ctx.arc(xCanvas, yCanvas, 50, 0, 2 * Math.PI);
+    ctx.font = "15pt bold";
+    ctx.textAlign = "center";
+    ctx.fillText(p.name, xCanvas, yCanvas + 60);
+    ctx.fillStyle = 'Red';
+    ctx.fill();
+}
+
+function drawSun(xCanvas, yCanvas) {
+    ctx.beginPath();
+    ctx.arc(xCanvas, yCanvas, 60, 0, 2 * Math.PI);
+    ctx.font = "15pt bold";
+    ctx.textAlign = "center";
+    ctx.fillText("Sun", xCanvas, yCanvas + 60);
+    ctx.fillStyle = 'yellow';
+    ctx.fill();
+}
+
+
+const options = { frequency: 20, referenceFrame: "device" };
 const sensor = new AbsoluteOrientationSensor(options);
 sensor.start();
 sensor.addEventListener("reading", () => {
@@ -435,28 +466,46 @@ sensor.addEventListener("reading", () => {
         }
     }
 
-    console.log('putz')
-
-    const moonEclipLL = Moon.eclipLatLong(jd)
-    const moonLoc = eclipticToEquitorial(moonEclipLL, jd)
-    const { altitude: moonAlt, azimuth: moonAz} = getAltAz(jd, userLatLong, moonLoc, true)
+    const moonLoc = eclipticToEquitorial(Moon.eclipLatLong(jd), jd)
+    const { altitude: moonAlt, azimuth: moonAz} = getAltAz(jd, userLatLong, moonLoc)
     const moon3Vec = to3Vec(moonAlt, moonAz, radius)
     const [_, mx, my, mz] = Quaternions.rotate(moon3Vec, inverseOrientQuat)
-
-
-    console.log('moonEclipLL', moonEclipLL)
-    console.log('moonLoc', moonLoc)
-    console.log('moon alt/az', moonAlt, moonAz)
-    console.log('moon3Vec', moon3Vec)
-
     if (mz < 0) {
         const xmCanvas = mx + width / 2
         const ymCanvas = -my + height / 2
-    console.log('moon canvas', xmCanvas, ymCanvas)
         drawMoon(xmCanvas, ymCanvas)
     }
 
 
+    const sunLoc = eclipticToEquitorial(sunEclipLatLong(jd), jd)
+    const { altitude: sunAlt, azimuth: sunAz} = getAltAz(jd, userLatLong, sunLoc)
+    const sun3Vec = to3Vec(sunAlt, sunAz, radius)
+    const [_s, sx, sy, sz] = Quaternions.rotate(sun3Vec, inverseOrientQuat)
+    if (sz < 0) {
+        const xsCanvas = sx + width / 2
+        const ysCanvas = -sy + height / 2
+        drawSun(xsCanvas, ysCanvas)
+    }
+
+    for (const p of planets) {
+        if (p.name != "Earth") {
+            const planetLoc = eclipticToEquitorial(planetEclipLatLong(jd, p, earth), jd)
+            const { altitude: pAlt, azimuth: pAz} = getAltAz(jd, userLatLong, planetLoc)
+            const p3Vec = to3Vec(pAlt, pAz, radius)
+            const [_p, px, py, pz] = Quaternions.rotate(p3Vec, inverseOrientQuat)
+            if (pz < 0) {
+                const xpCanvas = px + width / 2
+                const ypCanvas = -py + height / 2
+                drawPlanet(p, xpCanvas, ypCanvas)
+            }
+        }
+    }
+
+    console.log('in 2004')
+    for (const p of planets) {
+        const someDate = toJd(Date.UTC(2004, 0, 1, 0, 0, 0))
+        const planetLoc = eclipticToEquitorial(planetEclipLatLong(someDate, p, earth), someDate)
+    }
 
 
     console.log('totalStars', totalStars)

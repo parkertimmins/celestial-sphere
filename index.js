@@ -17,8 +17,7 @@ const sin = (deg) => Math.sin(rad(deg)),
       acos = (x) => degree(Math.acos(x)), 
       asin = (x) => degree(Math.asin(x)), 
       atan = (x) => degree(Math.atan(x)), 
-      atan2 = (x, y) => degree(Math.atan2(x, y)), 
-      PI = Math.PI; 
+      atan2 = (x, y) => degree(Math.atan2(x, y));
 
 
 const EARTH_RADIUS_KM = 6378.14
@@ -155,10 +154,10 @@ function toAzimuth(vector4) {
     const thetaPiMax = -Math.atan2(y, x)
 
     // [0, 2PI] - positive ccw from east
-    const theta2PiMax = thetaPiMax < 0 ? 2 * PI + thetaPiMax : thetaPiMax
+    const theta2PiMax = thetaPiMax < 0 ? 2 * Math.PI + thetaPiMax : thetaPiMax
 
     // [0, 2PI] - positive ccw from north
-    const thetaFromNorth = (theta2PiMax + PI / 2) % (2 * PI)
+    const thetaFromNorth = (theta2PiMax + Math.PI / 2) % (2 * Math.PI)
 
     return degree(thetaFromNorth)
 }
@@ -245,6 +244,7 @@ const userLatLong = { lat: userLoc.coords.latitude, long: userLoc.coords.longitu
 
 const stars = await fetch('./data/stars_vis.json').then(response => response.json())
 const planets = await fetch('./data/planets.json').then(response => response.json())
+console.log(planets)
 const earth = planets.filter((p) => p.name === "Earth")[0]
 
 
@@ -337,79 +337,73 @@ function sunEclipLatLong(JD) {
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-
-
 canvas.width  = canvas.clientWidth;
 canvas.height = canvas.clientHeight;
 const width = canvas.width
 const height = canvas.height
-// make sphere such that height of phone covers 90 of sphere
-const radius = height / Math.sqrt(2) 
 
 
-const starAzFrame3Vec = [
-    { name: 'red', mag: 0, x1: 0, y1: 0, z1: radius }, // np
-    { name: 'green', mag: 0,  x1: 0, y1: 0, z1: -radius }, //sp
-    { name: 'blue', mag: 0, x1:0, y1: radius, z1: 0},        //vernal
-    { name: 'yellow', mag: 0, x1:0, y1: -radius, z1: 0}, // op vernal
-    { name: 'orange', mag: 0, x1:radius, y1: 0, z1: 0 }, 
-    { name: 'purple', mag: 0, x1:-radius, y1: 0, z1:0} 
-]
-
-const minMag = 4.5
+const toPixelSize = (deg) => circumference * (deg / 360)
+const drawImgCentered = (ctx, img, x, y, size) => ctx.drawImage(img, x-size/2, y-size/2, size, size)
 
 
-function drawStar(name, mag, xCanvas, yCanvas) {
-    ctx.beginPath();
-    // brightest star −1.46 (sirius
-    // least bright mag shown 
-    //
-    let size = -mag + minMag // between 0 and 8.46
+const radius = height / Math.sqrt(2)    // make sphere such that height of phone covers 90 of sphere
+const circumference = radius * 2 * Math.PI
+const brighestStarMag = -1.46           // sirius
+const minVisibleMag = 6               // dimmest magnitude shown
+const magRange = -brighestStarMag + minVisibleMag
+const maxStarSize = toPixelSize(0.4) // radius
+const minStarSize = toPixelSize(0.01)
+
+function drawStar(name, mag, x, y) {
+    const percMagRange = (-mag + minVisibleMag) / magRange // flip [-1.46, 4.5] and map to [0, 1]
+    console.log(percMagRange)
+    const imgRadius = percMagRange * (maxStarSize - minStarSize) + minStarSize
     
-    const magRange = 1.46 + minMag
-    const maxSize = 12
-    const minSize = 1
-    size = (size / magRange) * (maxSize - minSize) + minSize
-    ctx.arc(xCanvas, yCanvas, size, 0, 2 * Math.PI);
+    ctx.beginPath();
+    ctx.arc(x, y, imgRadius, 0, 2 * Math.PI);
     ctx.fillStyle = 'white';
     ctx.fill();
     
     ctx.font = "15pt bold";
     ctx.textAlign = "center";
     ctx.fillStyle = 'white';
-    ctx.fillText(name, xCanvas, yCanvas + 30);
+    const textPixOffset = imgRadius / 2 + toPixelSize(1)
+    ctx.fillText(name, x, y + textPixOffset);
 }
 
-function drawMoon(xCanvas, yCanvas) {
-    const img = images.Moon
-    ctx.drawImage(img, xCanvas-25, yCanvas-25, 50, 50)
 
+function drawMoon(x, y) {
+    const pixSize = toPixelSize(2.5)
+    drawImgCentered(ctx, images.Moon, x, y, pixSize)
+    
     ctx.font = "15pt bold";
     ctx.textAlign = "center";
     ctx.fillStyle = 'white';
-    ctx.fillText("Moon", xCanvas, yCanvas + 30);
+    const textPixOffset = pixSize / 2 + toPixelSize(1)
+    ctx.fillText("Moon", x, y + textPixOffset);
 }
 
-function drawPlanet(p, xCanvas, yCanvas) {
-    const img = images[p.name] 
-    ctx.drawImage(img, xCanvas-25, yCanvas-25, 50, 50)
-
-    ctx.font = "15pt bold";
-    ctx.textAlign = "center";
-    ctx.fillStyle = 'white';
-    ctx.fillText(p.name, xCanvas, yCanvas + 60);
-}
-
-function drawSun(xCanvas, yCanvas) {
-    const img = images.Sun
-    ctx.drawImage(img, xCanvas-25, yCanvas-25, 50, 50)
+function drawSun(x, y) {
+    const pixSize = toPixelSize(2.5)
+    drawImgCentered(ctx, images.Sun, x, y, pixSize) 
    
     ctx.font = "15pt bold";
     ctx.textAlign = "center";
     ctx.fillStyle = 'white';
-    ctx.fillText("Sun", xCanvas, yCanvas + 60);
+    const textPixOffset = pixSize / 2 + toPixelSize(1)
+    ctx.fillText("Sun", x, y + textPixOffset);
 }
 
+function drawPlanet(p, x, y) {
+    const pixSize = toPixelSize(p.imgSize)
+    drawImgCentered(ctx, images[p.name], x, y, pixSize) 
+    ctx.font = "15pt bold";
+    ctx.textAlign = "center";
+    ctx.fillStyle = 'white';
+    const textPixOffset = pixSize / 2 + toPixelSize(1)
+    ctx.fillText(p.name, x, y + textPixOffset);
+}
 
 const options = { frequency: 20, referenceFrame: "device" };
 const sensor = new AbsoluteOrientationSensor(options);
@@ -434,7 +428,7 @@ sensor.addEventListener("reading", () => {
         const star3Vec = to3Vec(starAlt, starAz, radius)
         const [_, x, y, z] = Quaternions.rotate(star3Vec, inverseOrientQuat)
         const inFrame = z < 0 && xMin <= x && x <= xMax && yMin <= y && y <= yMax
-        if (mag < minMag && inFrame) {
+        if (mag < minVisibleMag && inFrame) {
             const xCanvas = x + width / 2
             const yCanvas = -y + height / 2
             drawStar(name, mag, xCanvas, yCanvas)
@@ -450,7 +444,6 @@ sensor.addEventListener("reading", () => {
         const ymCanvas = -my + height / 2
         drawMoon(xmCanvas, ymCanvas)
     }
-
 
     const sunLoc = eclipticToEquitorial(sunEclipLatLong(jd), jd)
     const { altitude: sunAlt, azimuth: sunAz} = getAltAz(jd, userLatLong, sunLoc)

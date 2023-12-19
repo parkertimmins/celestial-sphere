@@ -412,6 +412,8 @@ function isIOS() {
 
 
 function iOSGetOrientationPerms() {
+    if (!is
+
     console.log('button push')
     // feature detect
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -431,6 +433,7 @@ function iOSGetOrientationPerms() {
                 console.log("gamma", gamma);
                 console.log("dir", dir);
             });
+          }
         })
         .catch(console.error);
     } else {
@@ -457,7 +460,7 @@ function iOSGetOrientationPerms() {
                         console.log(event);
                         console.log(down);
                     });
-
+              }
             })
             .catch(console.error);
         }
@@ -466,6 +469,8 @@ function iOSGetOrientationPerms() {
 
 
 document.getElementById("request-perms").onclick = iOSGetOrientationPerms;
+
+
 
 
 

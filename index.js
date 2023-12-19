@@ -412,8 +412,6 @@ function isIOS() {
 
 
 function iOSGetOrientationPerms() {
-    if (!is
-
     console.log('button push')
     // feature detect
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {

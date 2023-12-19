@@ -434,20 +434,9 @@ function iOSGetOrientationPerms() {
           }
         })
         .catch(console.error);
-    } else {
-            window.addEventListener('devicemotion', () => {
-                const noGrav = event.acceleration
-                const withGrav = event.accelerationIncludingGravity
-                const down = [noGrav.x - withGrav.x, noGrav.y - withGrav.y, noGrav.z - withGrav.z]
-                console.log(event);
-                console.log(down);
-            });
+    } 
 
-        console.log("DeviceOrientation not available");
-      // handle regular non iOS 13+ devices
-    }
-
-     if (typeof DeviceMotionEvent.requestPermission === 'function') {
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
           DeviceMotionEvent.requestPermission()
             .then(permissionState => {
               if (permissionState === 'granted') {
@@ -461,7 +450,6 @@ function iOSGetOrientationPerms() {
               }
             })
             .catch(console.error);
-        }
      }
 }
 

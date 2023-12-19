@@ -458,9 +458,9 @@ function iOSGetOrientationPerms() {
                         const noGrav = event.acceleration
                         const withGrav = event.accelerationIncludingGravity
                         const down = [noGrav.x - withGrav.x, noGrav.y - withGrav.y, noGrav.z - withGrav.z]
-
-                        console.log('accel no grav', noGrav)
-                        console.log('accel with grav', withGrav)
+                        
+                        console.log('accel no grav', [noGrav.x, noGrav.y, noGrav.z])
+                        console.log('accel with grav', [withGrav.x, withGrav.y, withGrav.z])
                         console.log('down', down);
                     });
               }

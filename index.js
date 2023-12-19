@@ -434,7 +434,21 @@ function iOSGetOrientationPerms() {
           }
         })
         .catch(console.error);
-    } 
+    } else {
+         window.addEventListener('deviceorientation', () => {
+                console.log(event);
+                var absolute = event.absolute;
+                var alpha    = event.alpha;
+                var beta     = event.beta;
+                var gamma    = event.gamma
+                var dir = event.webkitCompassHeading;
+                console.log("absolute", absolute);
+                console.log("alpha", alpha);
+                console.log("beta", beta);
+                console.log("gamma", gamma);
+                console.log("dir", dir);
+            });
+    }
 
     if (typeof DeviceMotionEvent.requestPermission === 'function') {
           DeviceMotionEvent.requestPermission()
@@ -444,12 +458,22 @@ function iOSGetOrientationPerms() {
                         const noGrav = event.acceleration
                         const withGrav = event.accelerationIncludingGravity
                         const down = [noGrav.x - withGrav.x, noGrav.y - withGrav.y, noGrav.z - withGrav.z]
-                        console.log(event);
-                        console.log(down);
+
+                        console.log('accel no grav', noGrav)
+                        console.log('accel with grav', withGrav)
+                        console.log('down', down);
                     });
               }
             })
             .catch(console.error);
+     } else {
+        window.addEventListener('devicemotion', () => {
+                        const noGrav = event.acceleration
+                        const withGrav = event.accelerationIncludingGravity
+                        const down = [noGrav.x - withGrav.x, noGrav.y - withGrav.y, noGrav.z - withGrav.z]
+                        console.log('down', down);
+                    });
+
      }
 }
 

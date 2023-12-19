@@ -73,4 +73,46 @@ Sphere Image
 
 
 
+Images:
 
+Sun
+    https://photojournal.jpl.nasa.gov/catalog/PIA22242
+
+Moon
+    https://photojournal.jpl.nasa.gov/catalog/PIA14011
+
+Mercury
+    https://photojournal.jpl.nasa.gov/catalog/PIA16858
+    
+Venus
+    https://photojournal.jpl.nasa.gov/catalog/PIA23791
+
+Jupiter
+    https://photojournal.jpl.nasa.gov/catalog/PIA02821
+
+Mars
+    https://photojournal.jpl.nasa.gov/catalog/PIA23515
+
+Saturn
+    https://photojournal.jpl.nasa.gov/catalog/PIA11141
+
+Neptune
+    https://photojournal.jpl.nasa.gov/catalog/PIA02210 
+
+Uranus
+    https://photojournal.jpl.nasa.gov/catalog/PIA18182  
+
+Pluto
+    https://photojournal.jpl.nasa.gov/catalog/PIA11709
+
+Photo Processing
+    - layer -> transparency -> add alpha channel
+    - ellipse select 
+        - select planet
+        - invert
+        - delete
+    - crop tool
+        - select smallest square containing circle
+    - image -> scale image -> reduce to 100px per side
+    - export
+     

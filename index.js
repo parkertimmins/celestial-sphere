@@ -419,7 +419,6 @@ function iOSGetOrientationPerms() {
         .then(permissionState => {
           if (permissionState === 'granted') {
             window.addEventListener('deviceorientation', () => {
-                console.log(event);
                 var absolute = event.absolute;
                 var alpha    = event.alpha;
                 var beta     = event.beta;
@@ -459,8 +458,8 @@ function iOSGetOrientationPerms() {
                         const withGrav = event.accelerationIncludingGravity
                         const down = [noGrav.x - withGrav.x, noGrav.y - withGrav.y, noGrav.z - withGrav.z]
                         
-                        console.log('accel no grav', [noGrav.x, noGrav.y, noGrav.z])
-                        console.log('accel with grav', [withGrav.x, withGrav.y, withGrav.z])
+                        console.log('accel no grav', noGrav.x, noGrav.y, noGrav.z)
+                        console.log('accel with grav', withGrav.x, withGrav.y, withGrav.z)
                         console.log('down', down);
                     });
               }

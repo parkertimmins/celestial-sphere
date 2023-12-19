@@ -142,8 +142,7 @@ function toAltitude(vector4) {
     // vector comes from a quaternion ... can throw away scalar 
     const [_, x, y, z] = vector4;
     const vecLenOnXYPlane = Math.sqrt(x**2 + y**2)
-    const altitude = atan(z / vecLenOnXYPlane)
-    return altitude
+    return atan(z / vecLenOnXYPlane)
 }
 
 function toAzimuth(vector4) {
@@ -244,7 +243,6 @@ const userLatLong = { lat: userLoc.coords.latitude, long: userLoc.coords.longitu
 
 const stars = await fetch('./data/stars_vis.json').then(response => response.json())
 const planets = await fetch('./data/planets.json').then(response => response.json())
-console.log(planets)
 const earth = planets.filter((p) => p.name === "Earth")[0]
 
 
@@ -357,7 +355,6 @@ const minStarSize = toPixelSize(0.01)
 
 function drawStar(name, mag, x, y) {
     const percMagRange = (-mag + minVisibleMag) / magRange // flip [-1.46, 4.5] and map to [0, 1]
-    console.log(percMagRange)
     const imgRadius = percMagRange * (maxStarSize - minStarSize) + minStarSize
     
     ctx.beginPath();
@@ -404,6 +401,74 @@ function drawPlanet(p, x, y) {
     const textPixOffset = pixSize / 2 + toPixelSize(1)
     ctx.fillText(p.name, x, y + textPixOffset);
 }
+
+
+
+
+
+function isIOS() {
+    return /(iPad|iPhone|iPod)/g.test(navigator.userAgent);
+}
+
+
+function iOSGetOrientationPerms() {
+    console.log('button push')
+    // feature detect
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission()
+        .then(permissionState => {
+          if (permissionState === 'granted') {
+            window.addEventListener('deviceorientation', () => {
+                console.log(event);
+                var absolute = event.absolute;
+                var alpha    = event.alpha;
+                var beta     = event.beta;
+                var gamma    = event.gamma
+                var dir = event.webkitCompassHeading;
+                console.log("absolute", absolute);
+                console.log("alpha", alpha);
+                console.log("beta", beta);
+                console.log("gamma", gamma);
+                console.log("dir", dir);
+            });
+        })
+        .catch(console.error);
+    } else {
+            window.addEventListener('devicemotion', () => {
+                const noGrav = event.acceleration
+                const withGrav = event.accelerationIncludingGravity
+                const down = [noGrav.x - withGrav.x, noGrav.y - withGrav.y, noGrav.z - withGrav.z]
+                console.log(event);
+                console.log(down);
+            });
+
+        console.log("DeviceOrientation not available");
+      // handle regular non iOS 13+ devices
+    }
+
+     if (typeof DeviceMotionEvent.requestPermission === 'function') {
+          DeviceMotionEvent.requestPermission()
+            .then(permissionState => {
+              if (permissionState === 'granted') {
+                    window.addEventListener('devicemotion', () => {
+                        const noGrav = event.acceleration
+                        const withGrav = event.accelerationIncludingGravity
+                        const down = [noGrav.x - withGrav.x, noGrav.y - withGrav.y, noGrav.z - withGrav.z]
+                        console.log(event);
+                        console.log(down);
+                    });
+
+            })
+            .catch(console.error);
+        }
+     }
+}
+
+
+document.getElementById("request-perms").onclick = iOSGetOrientationPerms;
+
+
+
 
 const options = { frequency: 20, referenceFrame: "device" };
 const sensor = new AbsoluteOrientationSensor(options);
@@ -456,7 +521,7 @@ sensor.addEventListener("reading", () => {
     }
 
     for (const p of planets) {
-        if (p.name != "Earth") {
+        if (p.name !== "Earth") {
             const planetLoc = eclipticToEquitorial(planetEclipLatLong(jd, p, earth), jd)
             const { altitude: pAlt, azimuth: pAz} = getAltAz(jd, userLatLong, planetLoc)
             const p3Vec = to3Vec(pAlt, pAz, radius)

@@ -70,8 +70,22 @@ function sum(arr) {
 }
 
 
+function toUnit(v) {
+    const len = Math.sqrt(sum(v.map(a => a*a)))
+    return v.map(a => a / len)
+}
+
+function cross(a, b) {
+    return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]
+}
+
 
 export class Quaternions {
+    static fromAngleAxis(angle, axis3Vec) {
+        const sinAngle2 = sin(angle/2)
+        return [cos(angle/2)].concat(axis3Vec.map(a => a*sinAngle2))
+    }
+
     // internal [s, v] - external [v, s]
     static toInternalQuat(q) {
         return [q[3], q[0], q[1], q[2]]
@@ -133,9 +147,9 @@ function getQuaternion(alpha, beta, gamma) {
 export function computeAltAzFromQuat(sensorQuaternion) {
     const deviceOriginVector = [0, 0, -1]
     const quaternion = Quaternions.toInternalQuat(sensorQuaternion)
-    const directionVec = Quaternions.rotate(deviceOriginVector, quaternion)
-    const altitude = toAltitude(directionVec)
-    const azimuth = toAzimuth(directionVec)
+    const directionQuat = Quaternions.rotate(deviceOriginVector, quaternion)
+    const altitude = toAltitude(directionQuat)
+    const azimuth = toAzimuth(directionQuat)
     return { altitude, azimuth }
 }
 function toAltitude(vector4) {
@@ -217,6 +231,11 @@ function azToTheta(azimuth) {
     let theta = azimuth
     theta = (theta - 90) % 360
     return theta <= 180 ? -theta : 360 -theta
+}
+
+function thetaToAz(theta) {
+    theta = -theta
+    return mod(theta + 90, 360)
 }
 
 function to3Vec(alt, az, length) {
@@ -403,93 +422,105 @@ function drawPlanet(p, x, y) {
 }
 
 
+const dot = (a, b) => sum(a.map((x, i) => x*b[i]))
 
 
+function buildOrientQuat(compassHeading, downVecInPhoneFrame) {
+    const phoneBack = [0, 0, -1]
+    const downVec = toUnit(downVecInPhoneFrame)
+
+    const axis = cross(downVec, phoneBack)
+    const axisUnit = toUnit(axis) 
+    const axisLen = Math.sqrt(sum(axis.map(a => a*a)))
+    const theta = atan(axisLen/dot(downVec, phoneBack))
+    const rotQuat = Quaternions.fromAngleAxis(theta, axisUnit)
+    const phoneNorth = [0, 1, 0]
+    const afterRot = Quaternions.rotate(phoneNorth, rotQuat).slice(1)
+    const lambda = atan2(afterRot[1], afterRot[0])
+    
+    const lambdaBearing = thetaToAz(lambda)
+    //console.log('lambdaBearing', lambdaBearing)
+    const bearingDiff = compassHeading - lambdaBearing
+    //console.log('bearingDiff', bearingDiff)
+    const aroundPole = Quaternions.fromAngleAxis(bearingDiff, [0, 0, -1]) // default back 
+    const finalRot = Quaternions.multiply(aroundPole, rotQuat)
+  
+    /*     
+    console.log('i(x) rot', Quaternions.rotate([1, 0, 0], finalRot).slice(1))
+    console.log('j(y) rot', Quaternions.rotate([0, 1, 0], finalRot).slice(1))
+    console.log('k(z) rot', Quaternions.rotate([0, 0, 1], finalRot).slice(1))
+    
+    console.log('after rot Quat') 
+    console.log('i(x) rot', Quaternions.rotate([1, 0, 0], rotQuat).slice(1))
+    console.log('j(y) rot', Quaternions.rotate([0, 1, 0], rotQuat).slice(1))
+    console.log('k(z) rot', Quaternions.rotate([0, 0, 1], rotQuat).slice(1))
+    
+    console.log('after around pole too') 
+    console.log('i(x) rot', Quaternions.rotate(Quaternions.rotate([1, 0, 0], rotQuat).slice(1), aroundPole).slice(1))
+    console.log('j(y) rot', Quaternions.rotate(Quaternions.rotate([0, 1, 0], rotQuat).slice(1), aroundPole).slice(1))
+    console.log('k(z) rot', Quaternions.rotate(Quaternions.rotate([0, 0, 1], rotQuat).slice(1), aroundPole).slice(1))
+    */
+    return finalRot 
+}
+
+buildOrientQuat(45, [0, -1, -1])
+// x -> unit([1, -1, , 1])
+// y -> unit([1, 1, 1])
+// z -> unit([-1, 0, 1]) ? 
+// 
+
+//buildOrientQuat(45, [-1, -1, -1])
+//buildOrientQuat(310, [0, -1, -1])
 
 function isIOS() {
     return /(iPad|iPhone|iPod)/g.test(navigator.userAgent);
 }
 
 
+
 function iOSGetOrientationPerms() {
-    console.log('button push')
-    // feature detect
+    document.getElementById("request-perms").style.display = 'none';
+
+    // ios globals
+    let compassHeading = 0 
+    let downVecPhoneFrame = [0, 0, -1]
+
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
       DeviceOrientationEvent.requestPermission()
         .then(permissionState => {
           if (permissionState === 'granted') {
             window.addEventListener('deviceorientation', () => {
-                var absolute = event.absolute;
-                var alpha    = event.alpha;
-                var beta     = event.beta;
-                var gamma    = event.gamma
-                var dir = event.webkitCompassHeading;
-                console.log("absolute", absolute);
-                console.log("alpha", alpha);
-                console.log("beta", beta);
-                console.log("gamma", gamma);
-                console.log("dir", dir);
+                compassHeading = event.webkitCompassHeading;
+                render(buildOrientQuat(compassHeading, downVecPhoneFrame))
             });
           }
         })
         .catch(console.error);
-    } else {
-         window.addEventListener('deviceorientation', () => {
-                console.log(event);
-                var absolute = event.absolute;
-                var alpha    = event.alpha;
-                var beta     = event.beta;
-                var gamma    = event.gamma
-                var dir = event.webkitCompassHeading;
-                console.log("absolute", absolute);
-                console.log("alpha", alpha);
-                console.log("beta", beta);
-                console.log("gamma", gamma);
-                console.log("dir", dir);
-            });
-    }
-
+    } 
     if (typeof DeviceMotionEvent.requestPermission === 'function') {
-          DeviceMotionEvent.requestPermission()
-            .then(permissionState => {
-              if (permissionState === 'granted') {
-                    window.addEventListener('devicemotion', () => {
-                        const noGrav = event.acceleration
-                        const withGrav = event.accelerationIncludingGravity
-                        const down = [noGrav.x - withGrav.x, noGrav.y - withGrav.y, noGrav.z - withGrav.z]
-                        
-                        console.log('accel no grav', noGrav.x, noGrav.y, noGrav.z)
-                        console.log('accel with grav', withGrav.x, withGrav.y, withGrav.z)
-                        console.log('down', down);
-                    });
-              }
-            })
-            .catch(console.error);
-     } else {
-        window.addEventListener('devicemotion', () => {
-                        const noGrav = event.acceleration
-                        const withGrav = event.accelerationIncludingGravity
-                        const down = [noGrav.x - withGrav.x, noGrav.y - withGrav.y, noGrav.z - withGrav.z]
-                        console.log('down', down);
-                    });
-
+      DeviceMotionEvent.requestPermission()
+        .then(permissionState => {
+          if (permissionState === 'granted') {
+            window.addEventListener('devicemotion', () => {
+                const noGrav = event.acceleration
+                const withGrav = event.accelerationIncludingGravity
+                downVecPhoneFrame = [noGrav.x - withGrav.x, noGrav.y - withGrav.y, noGrav.z - withGrav.z]
+                render(buildOrientQuat(compassHeading, downVecPhoneFrame))
+            });
+          }
+        })
+        .catch(console.error);
      }
 }
 
 
-document.getElementById("request-perms").onclick = iOSGetOrientationPerms;
 
 
 
 
 
 
-const options = { frequency: 20, referenceFrame: "device" };
-const sensor = new AbsoluteOrientationSensor(options);
-sensor.start();
-sensor.addEventListener("reading", () => {
-
-    const orientQuat = Quaternions.toInternalQuat(sensor.quaternion)
+function render(orientQuat) {
     const inverseOrientQuat = Quaternions.inverse(orientQuat)
 
     const jd = toJd(Date.now())
@@ -547,13 +578,22 @@ sensor.addEventListener("reading", () => {
             }
         }
     }
-});
-sensor.addEventListener("error", (error) => {
-    console.log(error)
-  if (event.error.name === "NotReadableError") {
-    console.log("Sensor is not available.");
-  }
-});
 
+}
+
+
+if (isIOS()) {
+    const allowButton = document.getElementById("request-perms")
+    allowButton.style.display = 'block';
+    allowButton.onclick = iOSGetOrientationPerms;
+} else {
+    const options = { frequency: 20, referenceFrame: "device" };
+    const sensor = new AbsoluteOrientationSensor(options);
+    sensor.start();
+    sensor.addEventListener("reading", () => {
+        render(Quaternions.toInternalQuat(sensor.quaternion))
+     });
+    sensor.addEventListener("error", (error) => console.log(error));
+}
 
 

@@ -115,4 +115,10 @@ Photo Processing
         - select smallest square containing circle
     - image -> scale image -> reduce to 100px per side
     - export
-     
+    
+
+
+Angle-Axis to Quaternion
+https://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToQuaternion/index.htm 
+https://math.stackexchange.com/questions/2356649/how-to-find-the-quaternion-representing-the-rotation-between-two-3-d-vectors
+https://possiblywrong.wordpress.com/2020/07/17/computing-the-angle-between-two-vectors/

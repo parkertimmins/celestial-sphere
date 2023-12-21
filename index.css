@@ -10,12 +10,13 @@ html, body {
     height:100%; 
 } 
 
-body {
-    /*background: red;*/
+#request-perms {
+    display: none;
 }
+
 canvas {
   width: 100%;
   height: 100%;
   display: block;
-  background: #080351;
+  background: #060333;
 }

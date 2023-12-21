@@ -116,6 +116,27 @@ export class Quaternions {
         const sn =  Quaternions.squaredNorm(q)
         return [q[0], -q[1], -q[2], -q[3]].map(a => a * 1.0 / sn)
     }
+
+    static fromAngles(alpha, beta, gamma) {
+      var _x = beta  || 0; 
+      var _y = gamma || 0; 
+      var _z = alpha || 0;
+
+      var cX = cos( _x/2 );
+      var cY = cos( _y/2 );
+      var cZ = cos( _z/2 );
+      var sX = sin( _x/2 );
+      var sY = sin( _y/2 );
+      var sZ = sin( _z/2 );
+
+      // ZXY quaternion construction.
+      var w = cX * cY * cZ - sX * sY * sZ;
+      var x = sX * cY * cZ - cX * sY * sZ;
+      var y = cX * sY * cZ + sX * cY * sZ;
+      var z = cX * cY * sZ + sX * sY * cZ;
+
+      return [ w, x, y, z ];
+    }
 }
 
 // https://www.w3.org/TR/orientation-event/#biblio-eulerangles
@@ -462,41 +483,28 @@ function isIOS() {
 function iOSGetOrientationPerms() {
     document.getElementById("request-perms").style.display = 'none';
 
-    // ios globals
-    let compassHeading = 0 
-    let downVecPhoneFrame = [0, 0, -1]
-
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
       DeviceOrientationEvent.requestPermission()
         .then(permissionState => {
           if (permissionState === 'granted') {
+
             window.addEventListener('deviceorientationabsolute', () => {
+
+
+                console.log(event)
                 console.log(event.absolute)
                 console.log(event.alpha)
                 console.log(event.beta)
                 console.log(event.gamma)
-                
-                compassHeading = event.webkitCompassHeading;
-                render(buildOrientQuat(compassHeading, downVecPhoneFrame))
+
+                const angleq = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
+                console.log('angle q', angleq)
+                render(angleq)
             }, true);
           }
         })
         .catch(console.error);
     } 
-    if (typeof DeviceMotionEvent.requestPermission === 'function') {
-      DeviceMotionEvent.requestPermission()
-        .then(permissionState => {
-          if (permissionState === 'granted') {
-            window.addEventListener('devicemotion', () => {
-                const noGrav = event.acceleration
-                const withGrav = event.accelerationIncludingGravity
-                downVecPhoneFrame = [noGrav.x - withGrav.x, noGrav.y - withGrav.y, noGrav.z - withGrav.z]
-                render(buildOrientQuat(compassHeading, downVecPhoneFrame))
-            });
-          }
-        })
-        .catch(console.error);
-     }
 }
 
 
@@ -607,6 +615,9 @@ if (isIOS()) {
         console.log(event.alpha)
         console.log(event.beta)
         console.log(event.gamma)
+
+        const angleq = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
+        console.log('angle q', angleq)
     }, true);
 
 
@@ -616,6 +627,7 @@ if (isIOS()) {
     const sensor = new AbsoluteOrientationSensor(options);
     sensor.start();
     sensor.addEventListener("reading", () => {
+        console.log('absolute sensor q', Quaternions.toInternalQuat(sensor.quaternion))
         render(Quaternions.toInternalQuat(sensor.quaternion))
      });
     sensor.addEventListener("error", (error) => console.log(error));

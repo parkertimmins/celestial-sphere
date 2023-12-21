@@ -25,7 +25,7 @@ const EARTH_RADIUS_KM = 6378.14
 // Originally from most recent Astronomical Almanac, at least 1999-2015
 // An Alternative Lunar Ephemeris Model
 // https://caps.gsfc.nasa.gov/simpson/pubs/slunar.pdf
-export class Moon {
+class Moon {
 
     // Main public method for 
     static eclipLatLong(jd) {
@@ -57,18 +57,11 @@ export class Moon {
             [-0.17, -407332.21, 217.6]
         ]
         return sum(sinConstants.map(([a, b, c]) => a * sin(b * t + c)))
-        //return sinConstants.map(([a, b, c]) => a * sin(b * t + c)).reduce((acc, a) => acc + a, 0)
     }
 }
 
-function sum(arr) {
-    let result = 0;
-    for (let a of arr) {
-        result += a;
-    }
-    return result;
-}
 
+const sum = (arr) => arr.reduce((a, b) => a+b, 0)
 
 function toUnit(v) {
     const len = Math.sqrt(sum(v.map(a => a*a)))
@@ -80,7 +73,7 @@ function cross(a, b) {
 }
 
 
-export class Quaternions {
+class Quaternions {
     static fromAngleAxis(angle, axis3Vec) {
         const sinAngle2 = sin(angle/2)
         return [cos(angle/2)].concat(axis3Vec.map(a => a*sinAngle2))
@@ -138,69 +131,6 @@ export class Quaternions {
       return [ w, x, y, z ];
     }
 }
-
-// https://www.w3.org/TR/orientation-event/#biblio-eulerangles
-function getQuaternion(alpha, beta, gamma) {
-
-  var _x = beta  || 0; // beta value
-  var _y = gamma || 0; // gamma value
-  var _z = alpha || 0; // alpha value
-
-  var cX = cos( _x/2 );
-  var cY = cos( _y/2 );
-  var cZ = cos( _z/2 );
-  var sX = sin( _x/2 );
-  var sY = sin( _y/2 );
-  var sZ = sin( _z/2 );
-
-  //
-  // ZXY quaternion construction.
-  //
-
-  var w = cX * cY * cZ - sX * sY * sZ;
-  var x = sX * cY * cZ - cX * sY * sZ;
-  var y = cX * sY * cZ + sX * cY * sZ;
-  var z = cX * cY * sZ + sX * sY * cZ;
-
-  return [ w, x, y, z ];
-}
-
-export function computeAltAzFromQuat(sensorQuaternion) {
-    const deviceOriginVector = [0, 0, -1]
-    const quaternion = Quaternions.toInternalQuat(sensorQuaternion)
-    const directionQuat = Quaternions.rotate(deviceOriginVector, quaternion)
-    const altitude = toAltitude(directionQuat)
-    const azimuth = toAzimuth(directionQuat)
-    return { altitude, azimuth }
-}
-function toAltitude(vector4) {
-    // vector comes from a quaternion ... can throw away scalar 
-    const [_, x, y, z] = vector4;
-    const vecLenOnXYPlane = Math.sqrt(x**2 + y**2)
-    return atan(z / vecLenOnXYPlane)
-}
-
-function toAzimuth(vector4) {
-    // vector comes from a quaternion ... can throw away scalar
-    const [_, x, y, z] = vector4;
-
-    // [PI, -PI] - positive ccw from east
-    const thetaPiMax = -Math.atan2(y, x)
-
-    // [0, 2PI] - positive ccw from east
-    const theta2PiMax = thetaPiMax < 0 ? 2 * Math.PI + thetaPiMax : thetaPiMax
-
-    // [0, 2PI] - positive ccw from north
-    const thetaFromNorth = (theta2PiMax + Math.PI / 2) % (2 * Math.PI)
-
-    return degree(thetaFromNorth)
-}
-
-
-
-
-
-
 
 
 // https://www.movable-type.co.uk/scripts/gis-faq-5.1.html
@@ -431,93 +361,13 @@ function drawPlanet(p, x, y) {
 const dot = (a, b) => sum(a.map((x, i) => x*b[i]))
 
 
-
-function buildOrientQuat(compassHeading, downVecInPhoneFrame) {
-    const phoneBack = [0, 0, -1]
-    const downVec = toUnit(downVecInPhoneFrame)
-
-    const axis = cross(downVec, phoneBack)
-    const axisUnit = toUnit(axis) 
-    const axisLen = Math.sqrt(sum(axis.map(a => a*a)))
-    const theta = atan(axisLen/dot(downVec, phoneBack))
-    const rotQuat = Quaternions.fromAngleAxis(theta, axisUnit)
-    const phoneNorth = [0, 1, 0]
-    const afterRot = Quaternions.rotate(phoneNorth, rotQuat).slice(1)
-    const lambda = atan2(afterRot[1], afterRot[0])
-    
-    const lambdaBearing = thetaToAz(lambda)
-    //console.log('lambdaBearing', lambdaBearing)
-    const bearingDiff = compassHeading - lambdaBearing
-    //console.log('bearingDiff', bearingDiff)
-    const aroundPole = Quaternions.fromAngleAxis(bearingDiff, [0, 0, -1]) // default back 
-    const finalRot = Quaternions.multiply(aroundPole, rotQuat)
-  
-    /*     
-    console.log('i(x) rot', Quaternions.rotate([1, 0, 0], finalRot).slice(1))
-    console.log('j(y) rot', Quaternions.rotate([0, 1, 0], finalRot).slice(1))
-    console.log('k(z) rot', Quaternions.rotate([0, 0, 1], finalRot).slice(1))
-    
-    console.log('after rot Quat') 
-    console.log('i(x) rot', Quaternions.rotate([1, 0, 0], rotQuat).slice(1))
-    console.log('j(y) rot', Quaternions.rotate([0, 1, 0], rotQuat).slice(1))
-    console.log('k(z) rot', Quaternions.rotate([0, 0, 1], rotQuat).slice(1))
-    
-    console.log('after around pole too') 
-    console.log('i(x) rot', Quaternions.rotate(Quaternions.rotate([1, 0, 0], rotQuat).slice(1), aroundPole).slice(1))
-    console.log('j(y) rot', Quaternions.rotate(Quaternions.rotate([0, 1, 0], rotQuat).slice(1), aroundPole).slice(1))
-    console.log('k(z) rot', Quaternions.rotate(Quaternions.rotate([0, 0, 1], rotQuat).slice(1), aroundPole).slice(1))
-    */
-    return finalRot 
-}
-
-
-
-function isIOS() {
-    return /(iPad|iPhone|iPod)/g.test(navigator.userAgent);
-}
-
-
-
-
-function iOSGetOrientationPerms() {
-    document.getElementById("request-perms").style.display = 'none';
-
-    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission()
-        .then(permissionState => {
-          if (permissionState === 'granted') {
-
-            window.addEventListener('deviceorientation', () => {
-
-
-                console.log(event)
-                console.log(event.absolute)
-                console.log(event.alpha)
-                console.log(event.beta)
-                console.log(event.gamma)
-
-                const angleq = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
-                console.log('angle q', angleq)
-
-         
-                render(angleq)
-            }, true);
-          }
-        })
-        .catch((err) => {
-            console.log('error', err);
-        });
-    } 
-}
-
+const isIOS = () => /(iPad|iPhone)/g.test(navigator.userAgent)
 
 
 
 
 const objects = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
-
 const promises = []
-
 
 promises.push(fetch('./data/stars_vis.json').then(response => response.json()))
 promises.push(fetch('./data/planets.json').then(response => response.json()))
@@ -603,18 +453,33 @@ function render(orientQuat) {
 
 }
 
+function iOSGetOrientationPerms() {
+    document.getElementById("request-perms").style.display = 'none';
 
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission()
+        .then(permissionState => {
+          if (permissionState === 'granted') {
+            window.addEventListener('deviceorientation', () => {
+                //console.log(event.absolute, event.alpha, event.beta, event.gamma)
+                const angleq = Quaternions.fromAngles(event.webkitCompassHeading, event.beta, event.gamma)
+                render(angleq)
+            }, true);
+          }
+        })
+        .catch(console.error);
+    } 
+}
 
 if (isIOS()) {
     const allowButton = document.getElementById("request-perms")
     allowButton.style.display = 'block';
     allowButton.onclick = iOSGetOrientationPerms;
 } else {
-    const options = { frequency: 20, referenceFrame: "device" };
+    const options = { frequency: 30, referenceFrame: "device" };
     const sensor = new AbsoluteOrientationSensor(options);
     sensor.start();
     sensor.addEventListener("reading", () => {
-        console.log('absolute sensor q', Quaternions.toInternalQuat(sensor.quaternion))
         render(Quaternions.toInternalQuat(sensor.quaternion))
      });
     sensor.addEventListener("error", (error) => console.log(error));

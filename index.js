@@ -478,15 +478,6 @@ function isIOS() {
 
 
 
-function log(msg) {
-    var div = document.getElementById('log');
-
-    div.innerHTML += msg;
-    div.innerHTML += '\n';
-}
-
-
-
 
 function iOSGetOrientationPerms() {
     document.getElementById("request-perms").style.display = 'none';
@@ -508,20 +499,13 @@ function iOSGetOrientationPerms() {
                 const angleq = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
                 console.log('angle q', angleq)
 
-                log(event.absolute)
-                log(event.alpha)
-                log(event.beta)
-                log(event.gamma)
-
-
-
+         
                 render(angleq)
             }, true);
           }
         })
         .catch((err) => {
             console.log('error', err);
-            log(err)
         });
     } 
 }
@@ -621,35 +605,11 @@ function render(orientQuat) {
 
 
 
-
 if (isIOS()) {
     const allowButton = document.getElementById("request-perms")
     allowButton.style.display = 'block';
     allowButton.onclick = iOSGetOrientationPerms;
 } else {
-
-    window.addEventListener('deviceorientationabsolute', () => {
-        console.log(event)
-        console.log(event.absolute)
-        console.log(event.alpha)
-        console.log(event.beta)
-        console.log(event.gamma)
-
-                log(event.absolute)
-                log(event.alpha)
-                log(event.beta)
-                log(event.gamma)
-
-
-
-
-        const angleq = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
-        console.log('angle q', angleq)
-    }, true);
-
-
-
-
     const options = { frequency: 20, referenceFrame: "device" };
     const sensor = new AbsoluteOrientationSensor(options);
     sensor.start();

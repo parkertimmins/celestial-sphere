@@ -251,18 +251,9 @@ function toLatLongWest(latLong) {
     return {lat: latLong.lat, long: longWest } 
 }
 
-const austin = { lat: 30.2789, long: -97.7487 } 
-
 function getPosition() {
     return new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject))
 }
-
-const userLoc = await getPosition()
-const userLatLong = { lat: userLoc.coords.latitude, long: userLoc.coords.longitude }
-
-const stars = await fetch('./data/stars_vis.json').then(response => response.json())
-const planets = await fetch('./data/planets.json').then(response => response.json())
-const earth = planets.filter((p) => p.name === "Earth")[0]
 
 
 const loadImage = (url) => new Promise((resolve, reject) => {
@@ -271,14 +262,8 @@ const loadImage = (url) => new Promise((resolve, reject) => {
   img.src = url;
 });
 
-const images = {}
-images['Sun'] = await loadImage('./images/icons/sun.png')
-images['Moon'] = await loadImage('./images/icons/moon.png')
-for (const p of planets) {
-    if (p.name !== 'Earth') {
-        images[p.name] = await loadImage('./images/icons/' + p.name.toLowerCase() + '.png')
-    }
-}
+
+
 
 
 const EARTH_OBLIQUITY = 23.4393 // epsilon
@@ -463,18 +448,14 @@ function buildOrientQuat(compassHeading, downVecInPhoneFrame) {
     return finalRot 
 }
 
-buildOrientQuat(45, [0, -1, -1])
-// x -> unit([1, -1, , 1])
-// y -> unit([1, 1, 1])
-// z -> unit([-1, 0, 1]) ? 
-// 
 
-//buildOrientQuat(45, [-1, -1, -1])
-//buildOrientQuat(310, [0, -1, -1])
 
 function isIOS() {
     return /(iPad|iPhone|iPod)/g.test(navigator.userAgent);
 }
+
+
+
 
 
 
@@ -517,6 +498,31 @@ function iOSGetOrientationPerms() {
 
 
 
+const objects = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
+
+const promises = []
+
+
+promises.push(fetch('./data/stars_vis.json').then(response => response.json()))
+promises.push(fetch('./data/planets.json').then(response => response.json()))
+for (const obj of objects) {
+    promises.push(loadImage('./images/icons/' + obj + '.png'))
+}
+
+
+const resolved = await Promise.all(promises)
+const stars = resolved[0]
+const planets = resolved[1]
+const earth = planets.filter((p) => p.name === "Earth")[0]
+
+
+const images = {}
+for (let i = 0; i < objects.length; i++) {
+    images[objects[i]] = resolved[i+2]
+}
+
+const userLoc = await getPosition()
+const userLatLong = { lat: userLoc.coords.latitude, long: userLoc.coords.longitude }
 
 
 
@@ -580,6 +586,8 @@ function render(orientQuat) {
     }
 
 }
+
+
 
 
 if (isIOS()) {

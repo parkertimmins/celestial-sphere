@@ -496,7 +496,7 @@ function iOSGetOrientationPerms() {
         .then(permissionState => {
           if (permissionState === 'granted') {
 
-            window.addEventListener('deviceorientationabsolute', () => {
+            window.addEventListener('deviceorientation', () => {
 
 
                 console.log(event)

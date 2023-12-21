@@ -470,10 +470,15 @@ function iOSGetOrientationPerms() {
       DeviceOrientationEvent.requestPermission()
         .then(permissionState => {
           if (permissionState === 'granted') {
-            window.addEventListener('deviceorientation', () => {
+            window.addEventListener('deviceorientationabsolute', () => {
+                console.log(event.absolute)
+                console.log(event.alpha)
+                console.log(event.beta)
+                console.log(event.gamma)
+                
                 compassHeading = event.webkitCompassHeading;
                 render(buildOrientQuat(compassHeading, downVecPhoneFrame))
-            });
+            }, true);
           }
         })
         .catch(console.error);
@@ -595,6 +600,18 @@ if (isIOS()) {
     allowButton.style.display = 'block';
     allowButton.onclick = iOSGetOrientationPerms;
 } else {
+
+    window.addEventListener('deviceorientationabsolute', () => {
+        console.log(event)
+        console.log(event.absolute)
+        console.log(event.alpha)
+        console.log(event.beta)
+        console.log(event.gamma)
+    }, true);
+
+
+
+
     const options = { frequency: 20, referenceFrame: "device" };
     const sensor = new AbsoluteOrientationSensor(options);
     sensor.start();

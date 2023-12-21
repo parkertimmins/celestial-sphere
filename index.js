@@ -431,6 +431,7 @@ function drawPlanet(p, x, y) {
 const dot = (a, b) => sum(a.map((x, i) => x*b[i]))
 
 
+
 function buildOrientQuat(compassHeading, downVecInPhoneFrame) {
     const phoneBack = [0, 0, -1]
     const downVec = toUnit(downVecInPhoneFrame)
@@ -477,6 +478,13 @@ function isIOS() {
 
 
 
+function log(msg) {
+    var div = document.getElementById('log');
+
+    div.innerHTML += msg;
+    div.innerHTML += '\n';
+}
+
 
 
 
@@ -499,11 +507,22 @@ function iOSGetOrientationPerms() {
 
                 const angleq = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
                 console.log('angle q', angleq)
+
+                log(event.absolute)
+                log(event.alpha)
+                log(event.beta)
+                log(event.gamma)
+
+
+
                 render(angleq)
             }, true);
           }
         })
-        .catch(console.error);
+        .catch((err) => {
+            console.log('error', err);
+            log(err)
+        });
     } 
 }
 
@@ -615,6 +634,14 @@ if (isIOS()) {
         console.log(event.alpha)
         console.log(event.beta)
         console.log(event.gamma)
+
+                log(event.absolute)
+                log(event.alpha)
+                log(event.beta)
+                log(event.gamma)
+
+
+
 
         const angleq = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
         console.log('angle q', angleq)

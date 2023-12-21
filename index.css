@@ -12,6 +12,15 @@ html, body {
 
 #request-perms {
     display: none;
+    width: 100%;
+    height: 50%;
+    margin: 0;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    /*  transform: translate(-50%, -50%); */
+    font-size: 10em;
+
 }
 
 canvas {

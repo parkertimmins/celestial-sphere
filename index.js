@@ -20,8 +20,6 @@ const sin = (deg) => Math.sin(rad(deg)),
       atan2 = (x, y) => degree(Math.atan2(x, y));
 
 
-const EARTH_RADIUS_KM = 6378.14
-
 // Originally from most recent Astronomical Almanac, at least 1999-2015
 // An Alternative Lunar Ephemeris Model
 // https://caps.gsfc.nasa.gov/simpson/pubs/slunar.pdf
@@ -364,6 +362,9 @@ function toCanvasCoords(jd, ra, dec, inverseOrientQuat) {
     const { altitude, azimuth} = getAltAz(jd, userLatLong, { ra, dec })
     const vecOnSphere = to3Vec(altitude, azimuth, radius)
     const rotVecOnSphere = Quaternions.rotate(vecOnSphere, inverseOrientQuat).slice(1)
+    if (rotVecOnSphere[2] > 0) {
+        return null
+    }
 
     //https://math.stackexchange.com/questions/3412199/how-to-calculate-the-intersection-point-of-a-vector-and-a-plane-defined-as-a-poi
     const [x, y, z] = scalarMult(-distToPlane / rotVecOnSphere[2], rotVecOnSphere)

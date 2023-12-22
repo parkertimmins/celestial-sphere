@@ -294,6 +294,7 @@ canvas.width  = canvas.clientWidth;
 canvas.height = canvas.clientHeight;
 const width = canvas.width
 const height = canvas.height
+const xMax = width / 2, xMin = -width /2, yMax = height / 2, yMin = -height /2
 
 
 const toPixelSize = (deg) => circumference * (deg / 360)
@@ -302,6 +303,8 @@ const drawImgCentered = (ctx, img, x, y, size) => ctx.drawImage(img, x-size/2, y
 
 const radius = height / Math.sqrt(2)    // make sphere such that height of phone covers 90 of sphere
 const circumference = radius * 2 * Math.PI
+const longVisAngle = 45
+const distToPlane = radius * cos(longVisAngle / 2) 
 const brighestStarMag = -1.46           // sirius
 const minVisibleMag = 6               // dimmest magnitude shown
 const magRange = -brighestStarMag + minVisibleMag
@@ -357,8 +360,20 @@ function drawPlanet(p, x, y) {
     ctx.fillText(p.name, x, y + textPixOffset);
 }
 
+function toCanvasCoords(jd, ra, dec, inverseOrientQuat) {
+    const { altitude, azimuth} = getAltAz(jd, userLatLong, { ra, dec })
+    const vecOnSphere = to3Vec(altitude, azimuth, radius)
+    const rotVecOnSphere = Quaternions.rotate(vecOnSphere, inverseOrientQuat).slice(1)
+
+    //https://math.stackexchange.com/questions/3412199/how-to-calculate-the-intersection-point-of-a-vector-and-a-plane-defined-as-a-poi
+    const [x, y, z] = scalarMult(-distToPlane / rotVecOnSphere[2], rotVecOnSphere)
+    const inFrame = z < 0 && xMin <= x && x <= xMax && yMin <= y && y <= yMax
+    return inFrame ? [x + width / 2, -y + height / 2] : null
+}
+
 
 const dot = (a, b) => sum(a.map((x, i) => x*b[i]))
+const scalarMult = (a, v) => v.map((x, i) => a * x)
 
 
 const isIOS = () => /(iPad|iPhone)/g.test(navigator.userAgent)
@@ -394,63 +409,43 @@ const userLatLong = { lat: userLoc.coords.latitude, long: userLoc.coords.longitu
 
 function render(orientQuat) {
     const inverseOrientQuat = Quaternions.inverse(orientQuat)
-
     const jd = toJd(Date.now())
-
-    const totalStars = stars.length
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const xMax = width / 2, xMin = -width /2, yMax = height / 2, yMin = -height /2
     for (const star of stars) {
         let { name, mag, ra, dec } = star
-        // celestial ra from hvg dataset is in hours, so times 15 to get degrees
-        ra *= 15
-
-        const { altitude: starAlt, azimuth: starAz} = getAltAz(jd, userLatLong, { ra, dec })
-        const star3Vec = to3Vec(starAlt, starAz, radius)
-        const [_, x, y, z] = Quaternions.rotate(star3Vec, inverseOrientQuat)
-        const inFrame = z < 0 && xMin <= x && x <= xMax && yMin <= y && y <= yMax
-        if (mag < minVisibleMag && inFrame) {
-            const xCanvas = x + width / 2
-            const yCanvas = -y + height / 2
-            drawStar(name, mag, xCanvas, yCanvas)
-        }
-    }
-
-    const moonLoc = eclipticToEquitorial(Moon.eclipLatLong(jd), jd)
-    const { altitude: moonAlt, azimuth: moonAz} = getAltAz(jd, userLatLong, moonLoc)
-    const moon3Vec = to3Vec(moonAlt, moonAz, radius)
-    const [_, mx, my, mz] = Quaternions.rotate(moon3Vec, inverseOrientQuat)
-    if (mz < 0) {
-        const xmCanvas = mx + width / 2
-        const ymCanvas = -my + height / 2
-        drawMoon(xmCanvas, ymCanvas)
-    }
-
-    const sunLoc = eclipticToEquitorial(sunEclipLatLong(jd), jd)
-    const { altitude: sunAlt, azimuth: sunAz} = getAltAz(jd, userLatLong, sunLoc)
-    const sun3Vec = to3Vec(sunAlt, sunAz, radius)
-    const [_s, sx, sy, sz] = Quaternions.rotate(sun3Vec, inverseOrientQuat)
-    if (sz < 0) {
-        const xsCanvas = sx + width / 2
-        const ysCanvas = -sy + height / 2
-        drawSun(xsCanvas, ysCanvas)
-    }
-
-    for (const p of planets) {
-        if (p.name !== "Earth") {
-            const planetLoc = eclipticToEquitorial(planetEclipLatLong(jd, p, earth), jd)
-            const { altitude: pAlt, azimuth: pAz} = getAltAz(jd, userLatLong, planetLoc)
-            const p3Vec = to3Vec(pAlt, pAz, radius)
-            const [_p, px, py, pz] = Quaternions.rotate(p3Vec, inverseOrientQuat)
-            if (pz < 0) {
-                const xpCanvas = px + width / 2
-                const ypCanvas = -py + height / 2
-                drawPlanet(p, xpCanvas, ypCanvas)
+        if (mag < minVisibleMag) {
+            // celestial ra from hvg dataset is in hours, so times 15 to get degrees
+            const coords = toCanvasCoords(jd, ra*15, dec, inverseOrientQuat)
+            if (coords !== null) {
+                drawStar(name, mag, coords[0], coords[1])
             }
         }
     }
-
+    {
+        const moonLoc = eclipticToEquitorial(Moon.eclipLatLong(jd), jd)
+        const coords = toCanvasCoords(jd, moonLoc.ra, moonLoc.dec, inverseOrientQuat)
+        if (coords !== null) {
+            drawMoon(...coords)
+        }
+    }
+    {
+        const sunLoc = eclipticToEquitorial(sunEclipLatLong(jd), jd)
+        const coords = toCanvasCoords(jd, sunLoc.ra, sunLoc.dec, inverseOrientQuat)
+        if (coords !== null) {
+            drawSun(...coords)
+        }
+    }
+    
+    for (const p of planets) {
+        if (p.name !== "Earth") {
+            const planetLoc = eclipticToEquitorial(planetEclipLatLong(jd, p, earth), jd)
+            const coords = toCanvasCoords(jd, planetLoc.ra, planetLoc.dec, inverseOrientQuat)
+            if (coords !== null) {
+                drawPlanet(p, ...coords)
+            }
+        }
+    }
 }
 
 function iOSGetOrientationPerms() {
@@ -480,7 +475,12 @@ if (isIOS()) {
     const sensor = new AbsoluteOrientationSensor(options);
     sensor.start();
     sensor.addEventListener("reading", () => {
-        render(Quaternions.toInternalQuat(sensor.quaternion))
+        const orientQuat = Quaternions.toInternalQuat(sensor.quaternion)
+
+        //const decFix = Quaternions.fromAngleAxis(2.8, [0, 0, -1])
+        //const q = Quaternions.multiply(orientQuat, decFix)
+
+        render(orientQuat)
      });
     sensor.addEventListener("error", (error) => console.log(error));
 }

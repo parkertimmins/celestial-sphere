@@ -458,8 +458,9 @@ function iOSGetOrientationPerms() {
           if (permissionState === 'granted') {
             window.addEventListener('deviceorientation', () => {
                 console.log(event.absolute, event.alpha, event.beta, event.gamma, event.webkitCompassHeading)
-                const angleq = Quaternions.fromAngles(-event.webkitCompassHeading, event.beta, event.gamma)
-                render(angleq)
+                const q = Quaternions.fromAngles(-event.webkitCompassHeading, event.beta, event.gamma)
+                console.log('quat', q[0], q[1], q[2], q[3])
+                render(q)
             }, true);
           }
         })

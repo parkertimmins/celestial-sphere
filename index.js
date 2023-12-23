@@ -212,8 +212,8 @@ function rectHelioEcliptical(jd, p) {
 
 function sunEclipLatLong(jd, earth) {
     const [x, y, z] = rectHelioEcliptical(jd, earth) 
-    // negate long since sun from earth rather than earth from sun 
-    return { long: mod(-atan2(y, x), 360), lat: 0 } 
+    // add 180 since sun from earth rather than earth from sun 
+    return { long: mod(atan2(y, x) + 180, 360), lat: 0 } 
 }
 
 // https://www.aa.quae.nl/en/reken/zonpositie.html
@@ -361,7 +361,6 @@ function render(orientQuat) {
         }
     }
     {
-
         const sunLoc = eclipticToEquitorial(sunEclipLatLong(jd, earth))
         const coords = toCanvasCoords(jd, sunLoc.ra, sunLoc.dec, inverseOrientQuat)
         if (coords !== null) {

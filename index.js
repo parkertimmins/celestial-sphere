@@ -31,7 +31,6 @@ const scalarMult = (a, v) => v.map((x, i) => a * x)
 // An Alternative Lunar Ephemeris Model
 // https://caps.gsfc.nasa.gov/simpson/pubs/slunar.pdf
 class Moon {
-
     static eclipLatLong(jd) {
         const t = toJulianCenturies(jd)
         return { long: Moon.eclipticLongBase(t), lat: Moon.eclipticLatBase(t) }
@@ -72,9 +71,8 @@ class Quaternions {
     }
 
     static rotate(vector, quaternion) {
-        const quatVector = [0].concat(vector);
         return Quaternions.multiply(
-            Quaternions.multiply(quaternion, quatVector),
+            Quaternions.multiply(quaternion, [0].concat(vector)),
             Quaternions.inverse(quaternion)
         );
     }
@@ -129,11 +127,7 @@ function haversineDist(p1, p2) {
 
 // since we are looking for the place at solar noon,  
 // and hour angle H = 0 = side real time - right ascension, side real time == ra  
-// theta(sidereal) = [theta0 + theta1 * (JD - J2000) - lw] mod 360 
-// (A + B) mod C = (A mod C + B mod C) mod C 
-// ra in degrees
 const raToLong = (jd, ra) => (280.1470 + 360.9856235 * (jd - j2000jd) - ra) % 360
-const eqCelestialToLatLong = (jd, ra, dec) => ({ lat: dec, long: raToLong(jd, ra) })
 
 
 // https://www.movable-type.co.uk/scripts/latlong.html - Bearing
@@ -154,7 +148,7 @@ function bearing(p1, p2) {
 // assume parallax is 0
 function getAltAz(jd, userLoc, celestial) {
     userLoc = toLatLongWest(userLoc) 
-    const latLongUnder = eqCelestialToLatLong(jd, celestial.ra, celestial.dec)
+    const latLongUnder = { lat: celestial.dec, long: raToLong(jd, celestial.ra) }
     const angleDist = haversineDist(latLongUnder, userLoc)
     const altitude = 90 - angleDist
     const azimuth = bearing(userLoc, latLongUnder)
@@ -179,15 +173,15 @@ function to3Vec(alt, az, length) {
 }
 
 function toLatLongWest(latLong) {
-    const long = latLong.long
+    const {lat, long} = latLong
     const longWest = long < 0 ? -long : 360 - long
-    return {lat: latLong.lat, long: longWest } 
+    return {lat: lat, long: longWest } 
 }
+
 
 function getPosition() {
     return new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject))
 }
-
 
 const loadImage = (url) => new Promise((resolve, reject) => {
   const img = new Image();
@@ -196,18 +190,10 @@ const loadImage = (url) => new Promise((resolve, reject) => {
 });
 
 
-
 const EARTH_OBLIQUITY = 23.4393
-function rightAscension(eclip) {
-    const l = cos(eclip.lat) * cos(eclip.long)
-    const m = 0.9175 * cos(eclip.lat) * sin(eclip.long) - 0.3978 * sin(eclip.lat)    
-    const newRes = atan(m/l) 
-    return atan2(sin(eclip.long) * cos(EARTH_OBLIQUITY) - tan(eclip.lat) * sin(EARTH_OBLIQUITY), cos(eclip.long))
-    return newRes
-}
-
+const rightAscension = (eclip) => atan2(sin(eclip.long) * cos(EARTH_OBLIQUITY) - tan(eclip.lat) * sin(EARTH_OBLIQUITY), cos(eclip.long))
 const declination = (eclip) => asin(sin(eclip.lat) * cos(EARTH_OBLIQUITY) + cos(eclip.lat) * sin(EARTH_OBLIQUITY) * sin(eclip.long))
-const eclipticToEquitorial = (eclipLatLong) => ({ ra: rightAscension(eclipLatLong), dec: declination(eclipLatLong) })
+const eclipticToEquitorial = (eclip) => ({ ra: rightAscension(eclip), dec: declination(eclip) })
 
 //https://www.aa.quae.nl/en/reken/hemelpositie.html
 //https://www.aa.quae.nl/en/reken/zonpositie.html for kepler approximation
@@ -242,7 +228,6 @@ function planetEclipLatLong(jd, p, earth) {
     const beta = asin(z/delta)
     return { long: lambda, lat: beta } 
 }
-
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
@@ -324,7 +309,6 @@ function toCanvasCoords(jd, ra, dec, inverseOrientQuat) {
 
 
 const isIOS = () => /(iPad|iPhone)/g.test(navigator.userAgent)
-
 
 
 

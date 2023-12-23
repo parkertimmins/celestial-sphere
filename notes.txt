@@ -122,3 +122,12 @@ Angle-Axis to Quaternion
 https://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToQuaternion/index.htm 
 https://math.stackexchange.com/questions/2356649/how-to-find-the-quaternion-representing-the-rotation-between-two-3-d-vectors
 https://possiblywrong.wordpress.com/2020/07/17/computing-the-angle-between-two-vectors/
+
+
+Filtering Jitter
+https://jaantollander.com/post/noise-filtering-using-one-euro-filter/
+https://gery.casiez.net/1euro/
+
+
+Plane line intersection
+https://math.stackexchange.com/questions/3412199/how-to-calculate-the-intersection-point-of-a-vector-and-a-plane-defined-as-a-poi

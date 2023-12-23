@@ -1,5 +1,4 @@
 
-
 // https://en.wikipedia.org/wiki/Julian_day
 // https://github.com/mourner/suncalc/blob/master/suncalc.js 
 const millisPerDay = 1000 * 60 * 60 * 24
@@ -20,20 +19,22 @@ const sin = (deg) => Math.sin(rad(deg)),
       atan2 = (x, y) => degree(Math.atan2(x, y));
 
 
+const sum = (arr) => arr.reduce((a, b) => a+b, 0)
+const squaredNorm = (v) => sum(v.map(e => e*e))
+const norm = (v) => Math.sqrt(squaredNorm(v))
+const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]
+const dot = (a, b) => sum(a.map((x, i) => x*b[i]))
+const scalarMult = (a, v) => v.map((x, i) => a * x)
+
+
 // Originally from most recent Astronomical Almanac, at least 1999-2015
 // An Alternative Lunar Ephemeris Model
 // https://caps.gsfc.nasa.gov/simpson/pubs/slunar.pdf
 class Moon {
 
-    // Main public method for 
     static eclipLatLong(jd) {
         const t = toJulianCenturies(jd)
-        const eclipLongBase = Moon.eclipticLongBase(t)
-        const eclipLatBase = Moon.eclipticLatBase(t)
-        return {
-            long: eclipLongBase,
-            lat: eclipLatBase
-        }
+        return { long: Moon.eclipticLongBase(t), lat: Moon.eclipticLatBase(t) }
     }
 
     // t in julian centuries
@@ -59,18 +60,6 @@ class Moon {
 }
 
 
-const sum = (arr) => arr.reduce((a, b) => a+b, 0)
-
-function toUnit(v) {
-    const len = Math.sqrt(sum(v.map(a => a*a)))
-    return v.map(a => a / len)
-}
-
-function cross(a, b) {
-    return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]
-}
-
-
 class Quaternions {
     static fromAngleAxis(angle, axis3Vec) {
         const sinAngle2 = sin(angle/2)
@@ -90,10 +79,6 @@ class Quaternions {
         );
     }
 
-    static squaredNorm(q) {
-        return q[0]*q[0] + q[1]*q[1] + q[2]*q[2] + q[3]*q[3]
-    }
-
     static multiply(q, r) {
         return [
             r[0] * q[0] - r[1] * q[1] - r[2] * q[2] - r[3] * q[3],
@@ -104,10 +89,11 @@ class Quaternions {
     }
 
     static inverse(q) {
-        const sn =  Quaternions.squaredNorm(q)
-        return [q[0], -q[1], -q[2], -q[3]].map(a => a * 1.0 / sn)
+        const sn =  squaredNorm(q)
+        return [q[0], -q[1], -q[2], -q[3]].map(a => a / sn)
     }
-
+    
+    // https://w3c.github.io/deviceorientation/#deviceorientation (Example 11)
     static fromAngles(alpha, beta, gamma) {
       var _x = beta  || 0; 
       var _y = gamma || 0; 
@@ -175,16 +161,14 @@ function getAltAz(jd, userLoc, celestial) {
     return { altitude, azimuth } 
 }
 
+
+const thetaToAz = (theta) => mod(-theta + 90, 360)
+
 // 0 -> 360 from top to 0->90, 0 to -90
 function azToTheta(azimuth) {
     let theta = azimuth
     theta = (theta - 90) % 360
     return theta <= 180 ? -theta : 360 -theta
-}
-
-function thetaToAz(theta) {
-    theta = -theta
-    return mod(theta + 90, 360)
 }
 
 function to3Vec(alt, az, length) {
@@ -213,10 +197,7 @@ const loadImage = (url) => new Promise((resolve, reject) => {
 
 
 
-
-
-const EARTH_OBLIQUITY = 23.4393 // epsilon
-
+const EARTH_OBLIQUITY = 23.4393
 function rightAscension(eclip) {
     const l = cos(eclip.lat) * cos(eclip.long)
     const m = 0.9175 * cos(eclip.lat) * sin(eclip.long) - 0.3978 * sin(eclip.lat)    
@@ -225,17 +206,11 @@ function rightAscension(eclip) {
     return newRes
 }
 
-function declination(eclip) {
-    return asin(sin(eclip.lat) * cos(EARTH_OBLIQUITY) + cos(eclip.lat) * sin(EARTH_OBLIQUITY) * sin(eclip.long))
-}
+const declination = (eclip) => asin(sin(eclip.lat) * cos(EARTH_OBLIQUITY) + cos(eclip.lat) * sin(EARTH_OBLIQUITY) * sin(eclip.long))
+const eclipticToEquitorial = (eclipLatLong) => ({ ra: rightAscension(eclipLatLong), dec: declination(eclipLatLong) })
 
-// modified to output ra/dec in equitorial rather than 
-function eclipticToEquitorial(eclipLatLong, jd) {
-    const ra = rightAscension(eclipLatLong)
-    const dec = declination(eclipLatLong)
-    return { ra, dec } 
-}
-
+//https://www.aa.quae.nl/en/reken/hemelpositie.html
+//https://www.aa.quae.nl/en/reken/zonpositie.html for kepler approximation
 function rectHelioEcliptical(jd, p) {
     const d = jd
     const d0 = j2000jd
@@ -243,13 +218,19 @@ function rectHelioEcliptical(jd, p) {
     const C = p.C1 * sin(M) + p.C2 * sin(2 * M) + p.C3 * sin(3 * M) * p.C4 * sin(4 * M) + p.C5 * sin(5 * M) + p.C6 * sin(6 * M)
     const nu = (M + C) % 360
     const r = p.a * (1 - p.e*p.e) / (1 + p.e * cos(nu))
-
     const x = r * (cos(p.OMEGA) * cos(p.omega + nu) - sin(p.OMEGA) * cos(p.i) * sin(p.omega + nu))
     const y = r * (sin(p.OMEGA) * cos(p.omega + nu) + cos(p.OMEGA) * cos(p.i) * sin(p.omega + nu))
     const z = r * sin(p.i) * sin(p.omega + nu)
     return [x, y, z]    
 }
 
+function sunEclipLatLong(jd, earth) {
+    const [x, y, z] = rectHelioEcliptical(jd, earth) 
+    // negate long since sun from earth rather than earth from sun 
+    return { long: mod(-atan2(y, x), 360), lat: 0 } 
+}
+
+// https://www.aa.quae.nl/en/reken/zonpositie.html
 function planetEclipLatLong(jd, p, earth) {
     const [xp, yp, zp] = rectHelioEcliptical(jd, p) 
     const [xe, ye, ze] = rectHelioEcliptical(jd, earth) 
@@ -260,29 +241,6 @@ function planetEclipLatLong(jd, p, earth) {
     const lambda = atan2(y, x)
     const beta = asin(z/delta)
     return { long: lambda, lat: beta } 
-}
-
-
-// degrees, long is [0, 360] west
-// https://www.aa.quae.nl/en/reken/zonpositie.html
-function sunEclipLatLong(JD) {
-    // mean anomaly
-    const M = (357.5291 + 0.98560028 * (JD - j2000jd)) % 360
-
-    // equation of center
-    const C = 1.9148 * sin(M) + 0.02 * sin(2 * M) + 0.0003 * sin(3 * M)
-
-    // Perihelion and the Obliquity of the Ecliptic
-    const eclipticLongPeri = 102.9373 // perihelion of the earth, relative to the ecliptic and vernal equinox
-
-    // mean ecliptic long
-    const L = M + eclipticLongPeri
-
-    // ecliptic long - 180 for the earth
-    const lambda = L + C + 180
-    
-    // ecliptic lat - divergence of sun from ecliptic is alway 0
-    return { long: lambda, lat: 0 } 
 }
 
 
@@ -306,8 +264,16 @@ const distToPlane = radius * cos(longVisAngle / 2)
 const brighestStarMag = -1.46           // sirius
 const minVisibleMag = 6               // dimmest magnitude shown
 const magRange = -brighestStarMag + minVisibleMag
-const maxStarSize = toPixelSize(0.4) // radius
+const maxStarSize = toPixelSize(0.3) // radius
 const minStarSize = toPixelSize(0.01)
+
+function addTitle(ctx, x, y, text, color, font, pixSize) {
+    ctx.font = font;
+    ctx.textAlign = "center";
+    ctx.fillStyle = color;
+    const textPixOffset = pixSize / 2 + toPixelSize(1)
+    ctx.fillText(text, x, y + textPixOffset);
+}
 
 function drawStar(name, mag, x, y) {
     const percMagRange = (-mag + minVisibleMag) / magRange // flip [-1.46, 4.5] and map to [0, 1]
@@ -318,44 +284,26 @@ function drawStar(name, mag, x, y) {
     ctx.fillStyle = 'white';
     ctx.fill();
     
-    ctx.font = "15pt bold";
-    ctx.textAlign = "center";
-    ctx.fillStyle = 'white';
-    const textPixOffset = imgRadius / 2 + toPixelSize(1)
-    ctx.fillText(name, x, y + textPixOffset);
+    addTitle(ctx, x, y, name, 'white', "15pt bold", imgRadius);
 }
 
 
 function drawMoon(x, y) {
     const pixSize = toPixelSize(2.5)
     drawImgCentered(ctx, images.Moon, x, y, pixSize)
-    
-    ctx.font = "15pt bold";
-    ctx.textAlign = "center";
-    ctx.fillStyle = 'white';
-    const textPixOffset = pixSize / 2 + toPixelSize(1)
-    ctx.fillText("Moon", x, y + textPixOffset);
+    addTitle(ctx, x, y, 'Moon', 'red', "20pt bold", pixSize);
 }
 
 function drawSun(x, y) {
     const pixSize = toPixelSize(2.5)
     drawImgCentered(ctx, images.Sun, x, y, pixSize) 
-   
-    ctx.font = "15pt bold";
-    ctx.textAlign = "center";
-    ctx.fillStyle = 'white';
-    const textPixOffset = pixSize / 2 + toPixelSize(1)
-    ctx.fillText("Sun", x, y + textPixOffset);
+    addTitle(ctx, x, y, 'Sun', 'white', "20pt bold", pixSize);
 }
 
 function drawPlanet(p, x, y) {
     const pixSize = toPixelSize(p.imgSize)
     drawImgCentered(ctx, images[p.name], x, y, pixSize) 
-    ctx.font = "15pt bold";
-    ctx.textAlign = "center";
-    ctx.fillStyle = 'white';
-    const textPixOffset = pixSize / 2 + toPixelSize(1)
-    ctx.fillText(p.name, x, y + textPixOffset);
+    addTitle(ctx, x, y, p.name, 'red', "20pt bold", pixSize);
 }
 
 function toCanvasCoords(jd, ra, dec, inverseOrientQuat) {
@@ -373,8 +321,6 @@ function toCanvasCoords(jd, ra, dec, inverseOrientQuat) {
 }
 
 
-const dot = (a, b) => sum(a.map((x, i) => x*b[i]))
-const scalarMult = (a, v) => v.map((x, i) => a * x)
 
 
 const isIOS = () => /(iPad|iPhone)/g.test(navigator.userAgent)
@@ -424,14 +370,15 @@ function render(orientQuat) {
         }
     }
     {
-        const moonLoc = eclipticToEquitorial(Moon.eclipLatLong(jd), jd)
+        const moonLoc = eclipticToEquitorial(Moon.eclipLatLong(jd))
         const coords = toCanvasCoords(jd, moonLoc.ra, moonLoc.dec, inverseOrientQuat)
         if (coords !== null) {
             drawMoon(...coords)
         }
     }
     {
-        const sunLoc = eclipticToEquitorial(sunEclipLatLong(jd), jd)
+
+        const sunLoc = eclipticToEquitorial(sunEclipLatLong(jd, earth))
         const coords = toCanvasCoords(jd, sunLoc.ra, sunLoc.dec, inverseOrientQuat)
         if (coords !== null) {
             drawSun(...coords)
@@ -440,7 +387,7 @@ function render(orientQuat) {
     
     for (const p of planets) {
         if (p.name !== "Earth") {
-            const planetLoc = eclipticToEquitorial(planetEclipLatLong(jd, p, earth), jd)
+            const planetLoc = eclipticToEquitorial(planetEclipLatLong(jd, p, earth))
             const coords = toCanvasCoords(jd, planetLoc.ra, planetLoc.dec, inverseOrientQuat)
             if (coords !== null) {
                 drawPlanet(p, ...coords)

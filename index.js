@@ -453,7 +453,7 @@ function iOSGetOrientationPerms() {
     document.getElementById("request-perms").style.display = 'none';
 
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission()
+      DeviceOrientationEvent.requestPermission(true)
         .then(permissionState => {
           if (permissionState === 'granted') {
             window.addEventListener('deviceorientation', () => {

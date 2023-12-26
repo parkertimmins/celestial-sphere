@@ -34,11 +34,11 @@ const euclideanDist = (x1, y1, x2, y2) => Math.sqrt((x2-x1)**2 + (y2-y1)**2)
 class Moon {
     static eclipLatLong(jd) {
         const t = toJulianCenturies(jd)
-        return { long: Moon.eclipticLongBase(t), lat: Moon.eclipticLatBase(t) }
+        return { long: Moon.eclipticLong(t), lat: Moon.eclipticLat(t) }
     }
 
     // t in julian centuries
-    static eclipticLongBase(t) {
+    static eclipticLong(t) {
         return 218.32 + 481267.881 * t +
              6.29 * sin( 477198.87 * t + 135.0) +
             -1.27 * sin(-413335.36 * t + 259.3) +
@@ -48,7 +48,7 @@ class Moon {
             -0.11 * sin( 966404.03 * t + 186.6)
     }
 
-    static eclipticLatBase(t) {
+    static eclipticLat(t) {
         const sinConstants = [
             [5.13,  483202.02,  93.3],
             [0.28,  960400.89,  228.2],
@@ -286,7 +286,7 @@ function drawStar(name, mag, x, y) {
 function drawMoon(x, y) {
     const pixSize = toPixelSize(2.5)
     drawImgCentered(ctx, images.Moon, x, y, pixSize)
-    addTitle(ctx, x, y, 'Moon', 'yellow', "20pt bold", pixSize);
+    addTitle(ctx, x, y, 'Moon', 'lightgreen', "20pt bold", pixSize);
 }
 
 function drawSun(x, y) {
@@ -298,7 +298,7 @@ function drawSun(x, y) {
 function drawPlanet(p, x, y) {
     const pixSize = toPixelSize(p.imgSize)
     drawImgCentered(ctx, images[p.name], x, y, pixSize) 
-    addTitle(ctx, x, y, p.name, 'yellow', "20pt bold", pixSize);
+    addTitle(ctx, x, y, p.name, 'lightgreen', "20pt bold", pixSize);
 }
 
 function toCanvasCoords(jd, ra, dec, inverseOrientQuat) {
@@ -332,7 +332,7 @@ function toCanvasCoords(jd, ra, dec, inverseOrientQuat) {
 class PinchZoom {
     constructor(element) {
         this.evCache = []
-        this.prevDeg = null
+        this.prevDegDist = null
     }
 
     removeEvent(ev) {
@@ -341,7 +341,7 @@ class PinchZoom {
             this.evCache.splice(index, 1)
         }
         if (this.evCache.length == 0) {
-            this.prevDeg = null
+            this.prevDegDist = null
         }
     }
 
@@ -355,31 +355,24 @@ class PinchZoom {
     onDownHandler(ev) {
         this.evCache.push(ev);
         if (this.evCache.length == 2) {
-            const currPix = euclideanDist(this.evCache[0].clientX, this.evCache[0].clientY, this.evCache[1].clientX, this.evCache[1].clientY)
-            this.prevDeg = longVisAngle * (currPix / height)
+            const pixDist = euclideanDist(this.evCache[0].clientX, this.evCache[0].clientY, this.evCache[1].clientX, this.evCache[1].clientY)
+            this.prevDegDist = longVisAngle * (pixDist / height)
         }
     }
 
     onMoveHandler(ev) {
         this.replaceEvent(ev)
-
         if (this.evCache.length == 2) {
-            const currPix = euclideanDist(this.evCache[0].clientX, this.evCache[0].clientY, this.evCache[1].clientX, this.evCache[1].clientY)
-            if (this.prevDeg !== null) {
-                longVisAngle = Math.min(90, this.prevDeg * (height / currPix)) // TODO global
-                distToPlane = cos(longVisAngle / 2)  // TODO global
-                render(orientQuat)
-            }
-            this.prevDeg = longVisAngle * (currPix / height)
+            const pixDist = euclideanDist(this.evCache[0].clientX, this.evCache[0].clientY, this.evCache[1].clientX, this.evCache[1].clientY)
+            longVisAngle = Math.min(90, this.prevDegDist * (height / pixDist)) // TODO global
+            distToPlane = cos(longVisAngle / 2)  // TODO global
+            render(orientQuat)
+            this.prevDegDist = longVisAngle * (pixDist / height)
         }
     }
 
     onUpHandler(ev) {
-        if (this.evCache.length == 2) {
-            this.prevDeg = null 
-        }
         this.removeEvent(ev)
-
     }
 
     setHandlers(el) {

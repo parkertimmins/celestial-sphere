@@ -25,6 +25,7 @@ const norm = (v) => Math.sqrt(squaredNorm(v))
 const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]
 const dot = (a, b) => sum(a.map((x, i) => x*b[i]))
 const scalarMult = (a, v) => v.map((x, i) => a * x)
+const euclideanDist = (x1, y1, x2, y2) => Math.sqrt((x2-x1)**2 + (y2-y1)**2)
 
 
 // Originally from most recent Astronomical Almanac, at least 1999-2015
@@ -165,11 +166,11 @@ function azToTheta(azimuth) {
     return theta <= 180 ? -theta : 360 -theta
 }
 
-function to3Vec(alt, az, length) {
-    const z = length * sin(alt)
-    const b = length * cos(alt)
+// to vectors on unit sphere
+function to3Vec(alt, az) {
+    const b = cos(alt)
     const theta = azToTheta(az)
-    return [b*cos(theta), b*sin(theta), z] 
+    return [b*cos(theta), b*sin(theta), sin(alt)] 
 }
 
 function toLatLongWest(latLong) {
@@ -233,24 +234,33 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 canvas.width  = canvas.clientWidth;
 canvas.height = canvas.clientHeight;
+
 const width = canvas.width
 const height = canvas.height
-const xMax = width / 2, xMin = -width /2, yMax = height / 2, yMin = -height /2
+const heightToWidthRatio = height / width
 
 
-const toPixelSize = (deg) => circumference * (deg / 360)
+
+let orientQuat = [0, 1, 1, 1]
+let longVisAngle = 90 // start with 1/4 screen visible
+let distToPlane = cos(longVisAngle / 2)
+
+
+let hSphere = 2 * sin(longVisAngle / 2)
+let wSphere = hSphere / heightToWidthRatio
+let sphereToPixScale = height / hSphere
+//let xMax = width / 2, xMin = -width /2, yMax = height / 2, yMin = -height /2
+const toPixelSize = (deg) => sphereToPixScale * rad(deg)
+const maxStarSize = () => toPixelSize(0.3) 
+const minStarSize = () => toPixelSize(0.01)
+
 const drawImgCentered = (ctx, img, x, y, size) => ctx.drawImage(img, x-size/2, y-size/2, size, size)
 
-
-const radius = height / Math.sqrt(2)    // make sphere such that height of phone covers 90 of sphere
-const circumference = radius * 2 * Math.PI
-const longVisAngle = 45
-const distToPlane = radius * cos(longVisAngle / 2) 
 const brighestStarMag = -1.46           // sirius
 const minVisibleMag = 6               // dimmest magnitude shown
 const magRange = -brighestStarMag + minVisibleMag
-const maxStarSize = toPixelSize(0.3) // radius
-const minStarSize = toPixelSize(0.01)
+
+
 
 function addTitle(ctx, x, y, text, color, font, pixSize) {
     ctx.font = font;
@@ -262,21 +272,21 @@ function addTitle(ctx, x, y, text, color, font, pixSize) {
 
 function drawStar(name, mag, x, y) {
     const percMagRange = (-mag + minVisibleMag) / magRange // flip [-1.46, 4.5] and map to [0, 1]
-    const imgRadius = percMagRange * (maxStarSize - minStarSize) + minStarSize
+    const imgRadius = percMagRange * (maxStarSize() - minStarSize()) + minStarSize()
     
     ctx.beginPath();
     ctx.arc(x, y, imgRadius, 0, 2 * Math.PI);
     ctx.fillStyle = 'white';
     ctx.fill();
     
-    addTitle(ctx, x, y, name, 'white', "15pt bold", imgRadius);
+    addTitle(ctx, x, y, name, 'white', "20pt bold", imgRadius);
 }
 
 
 function drawMoon(x, y) {
     const pixSize = toPixelSize(2.5)
     drawImgCentered(ctx, images.Moon, x, y, pixSize)
-    addTitle(ctx, x, y, 'Moon', 'red', "20pt bold", pixSize);
+    addTitle(ctx, x, y, 'Moon', 'yellow', "20pt bold", pixSize);
 }
 
 function drawSun(x, y) {
@@ -288,12 +298,12 @@ function drawSun(x, y) {
 function drawPlanet(p, x, y) {
     const pixSize = toPixelSize(p.imgSize)
     drawImgCentered(ctx, images[p.name], x, y, pixSize) 
-    addTitle(ctx, x, y, p.name, 'red', "20pt bold", pixSize);
+    addTitle(ctx, x, y, p.name, 'yellow', "20pt bold", pixSize);
 }
 
 function toCanvasCoords(jd, ra, dec, inverseOrientQuat) {
     const { altitude, azimuth} = getAltAz(jd, userLatLong, { ra, dec })
-    const vecOnSphere = to3Vec(altitude, azimuth, radius)
+    const vecOnSphere = to3Vec(altitude, azimuth)
     const rotVecOnSphere = Quaternions.rotate(vecOnSphere, inverseOrientQuat).slice(1)
     if (rotVecOnSphere[2] > 0) {
         return null
@@ -301,9 +311,88 @@ function toCanvasCoords(jd, ra, dec, inverseOrientQuat) {
 
     //https://math.stackexchange.com/questions/3412199/how-to-calculate-the-intersection-point-of-a-vector-and-a-plane-defined-as-a-poi
     const [x, y, z] = scalarMult(-distToPlane / rotVecOnSphere[2], rotVecOnSphere)
+
+    // TODO only recompute on resize
+    hSphere = 2 * sin(longVisAngle / 2)
+    wSphere = hSphere / heightToWidthRatio
+    sphereToPixScale = height / hSphere
+    const xMax = wSphere/2, xMin = -wSphere/2, yMax = hSphere/2, yMin = -hSphere/2
+    
     const inFrame = z < 0 && xMin <= x && x <= xMax && yMin <= y && y <= yMax
-    return inFrame ? [x + width / 2, -y + height / 2] : null
+    if (inFrame) {
+        const xPixOff = (x - xMin) * sphereToPixScale 
+        const yPixOff = (y - yMin) * sphereToPixScale 
+        return [xPixOff, height - yPixOff]
+    } else {
+        return null;
+    }
 }
+
+// https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events/Pinch_zoom_gestures
+class PinchZoom {
+    constructor(element) {
+        this.evCache = []
+        this.prevDeg = null
+    }
+
+    removeEvent(ev) {
+        const index = this.evCache.findIndex((cachedEv) => cachedEv.pointerId === ev.pointerId)
+        if (index >= 0) {
+            this.evCache.splice(index, 1)
+        }
+        if (this.evCache.length == 0) {
+            this.prevDeg = null
+        }
+    }
+
+    replaceEvent(ev) {
+        const index = this.evCache.findIndex((cachedEv) => cachedEv.pointerId === ev.pointerId);
+        if (index >= 0) {
+            this.evCache[index] = ev;
+        }
+    }
+
+    onDownHandler(ev) {
+        this.evCache.push(ev);
+        if (this.evCache.length == 2) {
+            const currPix = euclideanDist(this.evCache[0].clientX, this.evCache[0].clientY, this.evCache[1].clientX, this.evCache[1].clientY)
+            this.prevDeg = longVisAngle * (currPix / height)
+        }
+    }
+
+    onMoveHandler(ev) {
+        this.replaceEvent(ev)
+
+        if (this.evCache.length == 2) {
+            const currPix = euclideanDist(this.evCache[0].clientX, this.evCache[0].clientY, this.evCache[1].clientX, this.evCache[1].clientY)
+            if (this.prevDeg !== null) {
+                longVisAngle = Math.min(90, this.prevDeg * (height / currPix)) // TODO global
+                distToPlane = cos(longVisAngle / 2)  // TODO global
+                render(orientQuat)
+            }
+            this.prevDeg = longVisAngle * (currPix / height)
+        }
+    }
+
+    onUpHandler(ev) {
+        if (this.evCache.length == 2) {
+            this.prevDeg = null 
+        }
+        this.removeEvent(ev)
+
+    }
+
+    setHandlers(el) {
+        el.onpointerdown = (ev) => this.onDownHandler(ev)
+        el.onpointermove = (ev) => this.onMoveHandler(ev)
+        el.onpointerup = el.onpointercancel = el.onpointerout = el.onpointerleave = (ev) => this.onUpHandler(ev);
+    }
+}
+
+
+
+
+
 
 
 
@@ -407,7 +496,7 @@ if (isIOS()) {
     const sensor = new AbsoluteOrientationSensor(options);
     sensor.start();
     sensor.addEventListener("reading", () => {
-        const orientQuat = Quaternions.toInternalQuat(sensor.quaternion)
+        orientQuat = Quaternions.toInternalQuat(sensor.quaternion)
 
         //const decFix = Quaternions.fromAngleAxis(2.8, [0, 0, -1])
         //const q = Quaternions.multiply(orientQuat, decFix)
@@ -416,5 +505,8 @@ if (isIOS()) {
      });
     sensor.addEventListener("error", (error) => console.log(error));
 }
+
+const pinchZoom = new PinchZoom();
+pinchZoom.setHandlers(document.getElementById("canvas"));
 
 

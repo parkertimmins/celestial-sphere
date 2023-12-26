@@ -241,38 +241,38 @@ const heightToWidthRatio = height / width
 
 
 
+
 let orientQuat = [0, 1, 1, 1]
 let longVisAngle = 90 // start with 1/4 screen visible
-let distToPlane = cos(longVisAngle / 2)
 
 
-let hSphere = 2 * sin(longVisAngle / 2)
-let wSphere = hSphere / heightToWidthRatio
-let sphereToPixScale = height / hSphere
-//let xMax = width / 2, xMin = -width /2, yMax = height / 2, yMin = -height /2
-const toPixelSize = (deg) => sphereToPixScale * rad(deg)
-const maxStarSize = () => toPixelSize(0.3) 
-const minStarSize = () => toPixelSize(0.01)
+
+function toPixelSize(deg, visAngle) {
+    const hSphere = 2 * sin(visAngle / 2)
+    const wSphere = hSphere / heightToWidthRatio
+    const sphereToPixScale = height / hSphere
+    return sphereToPixScale * rad(deg)
+}
+const maxStarSize = (visAngle) => toPixelSize(0.3, visAngle) 
+const minStarSize = (visAngle) => toPixelSize(0.01, visAngle)
 
 const drawImgCentered = (ctx, img, x, y, size) => ctx.drawImage(img, x-size/2, y-size/2, size, size)
-
 const brighestStarMag = -1.46           // sirius
 const minVisibleMag = 6               // dimmest magnitude shown
 const magRange = -brighestStarMag + minVisibleMag
-
 
 
 function addTitle(ctx, x, y, text, color, font, pixSize) {
     ctx.font = font;
     ctx.textAlign = "center";
     ctx.fillStyle = color;
-    const textPixOffset = pixSize / 2 + toPixelSize(1)
+    const textPixOffset = pixSize / 2 + toPixelSize(1, longVisAngle)
     ctx.fillText(text, x, y + textPixOffset);
 }
 
 function drawStar(name, mag, x, y) {
     const percMagRange = (-mag + minVisibleMag) / magRange // flip [-1.46, 4.5] and map to [0, 1]
-    const imgRadius = percMagRange * (maxStarSize() - minStarSize()) + minStarSize()
+    const imgRadius = percMagRange * (maxStarSize(longVisAngle) - minStarSize(longVisAngle)) + minStarSize(longVisAngle)
     
     ctx.beginPath();
     ctx.arc(x, y, imgRadius, 0, 2 * Math.PI);
@@ -284,19 +284,19 @@ function drawStar(name, mag, x, y) {
 
 
 function drawMoon(x, y) {
-    const pixSize = toPixelSize(2.5)
+    const pixSize = toPixelSize(2.5, longVisAngle)
     drawImgCentered(ctx, images.Moon, x, y, pixSize)
     addTitle(ctx, x, y, 'Moon', 'lightgreen', "20pt bold", pixSize);
 }
 
 function drawSun(x, y) {
-    const pixSize = toPixelSize(2.5)
+    const pixSize = toPixelSize(2.5, longVisAngle)
     drawImgCentered(ctx, images.Sun, x, y, pixSize) 
     addTitle(ctx, x, y, 'Sun', 'white', "20pt bold", pixSize);
 }
 
 function drawPlanet(p, x, y) {
-    const pixSize = toPixelSize(p.imgSize)
+    const pixSize = toPixelSize(p.imgSize, longVisAngle)
     drawImgCentered(ctx, images[p.name], x, y, pixSize) 
     addTitle(ctx, x, y, p.name, 'lightgreen', "20pt bold", pixSize);
 }
@@ -310,12 +310,13 @@ function toCanvasCoords(jd, ra, dec, inverseOrientQuat) {
     }
 
     //https://math.stackexchange.com/questions/3412199/how-to-calculate-the-intersection-point-of-a-vector-and-a-plane-defined-as-a-poi
+    const distToPlane = cos(longVisAngle / 2)
     const [x, y, z] = scalarMult(-distToPlane / rotVecOnSphere[2], rotVecOnSphere)
 
     // TODO only recompute on resize
-    hSphere = 2 * sin(longVisAngle / 2)
-    wSphere = hSphere / heightToWidthRatio
-    sphereToPixScale = height / hSphere
+    const hSphere = 2 * sin(longVisAngle / 2)
+    const wSphere = hSphere / heightToWidthRatio
+    const sphereToPixScale = height / hSphere
     const xMax = wSphere/2, xMin = -wSphere/2, yMax = hSphere/2, yMin = -hSphere/2
     
     const inFrame = z < 0 && xMin <= x && x <= xMax && yMin <= y && y <= yMax
@@ -332,16 +333,12 @@ function toCanvasCoords(jd, ra, dec, inverseOrientQuat) {
 class PinchZoom {
     constructor(element) {
         this.evCache = []
-        this.prevDegDist = null
     }
 
     removeEvent(ev) {
         const index = this.evCache.findIndex((cachedEv) => cachedEv.pointerId === ev.pointerId)
         if (index >= 0) {
             this.evCache.splice(index, 1)
-        }
-        if (this.evCache.length == 0) {
-            this.prevDegDist = null
         }
     }
 
@@ -354,25 +351,24 @@ class PinchZoom {
 
     onDownHandler(ev) {
         this.evCache.push(ev);
-        if (this.evCache.length == 2) {
-            const pixDist = euclideanDist(this.evCache[0].clientX, this.evCache[0].clientY, this.evCache[1].clientX, this.evCache[1].clientY)
-            this.prevDegDist = longVisAngle * (pixDist / height)
-        }
-    }
-
-    onMoveHandler(ev) {
-        this.replaceEvent(ev)
-        if (this.evCache.length == 2) {
-            const pixDist = euclideanDist(this.evCache[0].clientX, this.evCache[0].clientY, this.evCache[1].clientX, this.evCache[1].clientY)
-            longVisAngle = Math.min(90, this.prevDegDist * (height / pixDist)) // TODO global
-            distToPlane = cos(longVisAngle / 2)  // TODO global
-            render(orientQuat)
-            this.prevDegDist = longVisAngle * (pixDist / height)
-        }
     }
 
     onUpHandler(ev) {
         this.removeEvent(ev)
+    }
+
+    onMoveHandler(ev) {
+        if (this.evCache.length == 2) {
+            const prevPixDist = euclideanDist(this.evCache[0].clientX, this.evCache[0].clientY, this.evCache[1].clientX, this.evCache[1].clientY)
+            const prevDegDist = longVisAngle * (prevPixDist / height)
+            this.replaceEvent(ev)
+            const currPixDist = euclideanDist(this.evCache[0].clientX, this.evCache[0].clientY, this.evCache[1].clientX, this.evCache[1].clientY)
+            const newLongVisAngle = Math.min(90, prevDegDist * (height / currPixDist)) 
+            longVisAngle = newLongVisAngle // TODO global
+            render(orientQuat)
+        } else {
+            this.replaceEvent(ev)
+        }
     }
 
     setHandlers(el) {

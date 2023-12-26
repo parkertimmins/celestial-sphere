@@ -31,34 +31,24 @@ const euclideanDist = (x1, y1, x2, y2) => Math.sqrt((x2-x1)**2 + (y2-y1)**2)
 // Originally from most recent Astronomical Almanac, at least 1999-2015
 // An Alternative Lunar Ephemeris Model
 // https://caps.gsfc.nasa.gov/simpson/pubs/slunar.pdf
-class Moon {
-    static eclipLatLong(jd) {
-        const t = toJulianCenturies(jd)
-        return { long: Moon.eclipticLong(t), lat: Moon.eclipticLat(t) }
-    }
-
-    // t in julian centuries
-    static eclipticLong(t) {
-        return 218.32 + 481267.881 * t +
-             6.29 * sin( 477198.87 * t + 135.0) +
-            -1.27 * sin(-413335.36 * t + 259.3) +
-             0.66 * sin( 890534.22 * t + 235.7) +
-             0.21 * sin( 954397.74 * t + 269.9) +
-            -0.19 * sin(  35999.05 * t + 357.5) +
-            -0.11 * sin( 966404.03 * t + 186.6)
-    }
-
-    static eclipticLat(t) {
-        const sinConstants = [
-            [5.13,  483202.02,  93.3],
-            [0.28,  960400.89,  228.2],
-            [-0.28, 6003.15,    318.3],
-            [-0.17, -407332.21, 217.6]
-        ]
-        return sum(sinConstants.map(([a, b, c]) => a * sin(b * t + c)))
-    }
+// Ignore parallax
+function moonEclipLatLong(jd) {
+    const t = toJulianCenturies(jd)
+    const long = 218.32 + 481267.881 * t +
+         6.29 * sin( 477198.87 * t + 135.0) +
+        -1.27 * sin(-413335.36 * t + 259.3) +
+         0.66 * sin( 890534.22 * t + 235.7) +
+         0.21 * sin( 954397.74 * t + 269.9) +
+        -0.19 * sin(  35999.05 * t + 357.5) +
+        -0.11 * sin( 966404.03 * t + 186.6)
+    
+    const lat = 5.13 * sin( 483202.02 * t + 93.3) +
+        0.28 * sin( 960400.89 * t +  228.2) +
+       -0.28 * sin( 6003.15 * t +    318.3) +
+       -0.17 * sin( -407332.21 * t + 217.6)
+    
+    return { lat, long }
 }
-
 
 class Quaternions {
     static fromAngleAxis(angle, axis3Vec) {
@@ -273,15 +263,12 @@ function addTitle(ctx, x, y, text, color, font, pixSize) {
 function drawStar(name, mag, x, y) {
     const percMagRange = (-mag + minVisibleMag) / magRange // flip [-1.46, 4.5] and map to [0, 1]
     const imgRadius = percMagRange * (maxStarSize(longVisAngle) - minStarSize(longVisAngle)) + minStarSize(longVisAngle)
-    
     ctx.beginPath();
     ctx.arc(x, y, imgRadius, 0, 2 * Math.PI);
     ctx.fillStyle = 'white';
     ctx.fill();
-    
     addTitle(ctx, x, y, name, 'white', "20pt bold", imgRadius);
 }
-
 
 function drawMoon(x, y) {
     const pixSize = toPixelSize(2.5, longVisAngle)
@@ -309,16 +296,15 @@ function toCanvasCoords(jd, ra, dec, inverseOrientQuat) {
         return null
     }
 
-    //https://math.stackexchange.com/questions/3412199/how-to-calculate-the-intersection-point-of-a-vector-and-a-plane-defined-as-a-poi
-    const distToPlane = cos(longVisAngle / 2)
-    const [x, y, z] = scalarMult(-distToPlane / rotVecOnSphere[2], rotVecOnSphere)
-
     // TODO only recompute on resize
+    const distToPlane = cos(longVisAngle / 2)
     const hSphere = 2 * sin(longVisAngle / 2)
     const wSphere = hSphere / heightToWidthRatio
     const sphereToPixScale = height / hSphere
     const xMax = wSphere/2, xMin = -wSphere/2, yMax = hSphere/2, yMin = -hSphere/2
     
+    //https://math.stackexchange.com/questions/3412199/how-to-calculate-the-intersection-point-of-a-vector-and-a-plane-defined-as-a-poi
+    const [x, y, z] = scalarMult(-distToPlane / rotVecOnSphere[2], rotVecOnSphere)
     const inFrame = z < 0 && xMin <= x && x <= xMax && yMin <= y && y <= yMax
     if (inFrame) {
         const xPixOff = (x - xMin) * sphereToPixScale 
@@ -432,7 +418,7 @@ function render(orientQuat) {
         }
     }
     {
-        const moonLoc = eclipticToEquitorial(Moon.eclipLatLong(jd))
+        const moonLoc = eclipticToEquitorial(moonEclipLatLong(jd))
         const coords = toCanvasCoords(jd, moonLoc.ra, moonLoc.dec, inverseOrientQuat)
         if (coords !== null) {
             drawMoon(...coords)

@@ -143,7 +143,6 @@ function getAltAz(jd, userLoc, celestial) {
     return { altitude, azimuth } 
 }
 
-
 const thetaToAz = (theta) => mod(-theta + 90, 360)
 
 // 0 -> 360 from top to 0->90, 0 to -90
@@ -277,7 +276,7 @@ function toCanvasCoords(jd, ra, dec, inverseOrientQuat, bounds) {
 
     //https://math.stackexchange.com/questions/3412199/how-to-calculate-the-intersection-point-of-a-vector-and-a-plane-defined-as-a-poi
     const [x, y, z] = scalarMult(-bounds.distToPlane / rotVecOnSphere[2], rotVecOnSphere)
-    const inFrame = z < 0 && bounds.xMin <= x && x <= bounds.xMax && bounds.yMin <= y && y <= bounds.yMax
+    const inFrame = bounds.xMin <= x && x <= bounds.xMax && bounds.yMin <= y && y <= bounds.yMax
     if (inFrame) {
         const xPixOff = (x - bounds.xBase) * bounds.sphereToPixScale 
         const yPixOff = (y - bounds.yBase) * bounds.sphereToPixScale 
@@ -287,50 +286,37 @@ function toCanvasCoords(jd, ra, dec, inverseOrientQuat, bounds) {
     }
 }
 
-
+function addObject(st, inverseOrientQuat, jd, eclipLatLong, drawFunc) {
+    const {ra, dec} = eclipticToEquitorial(eclipLatLong)
+    const coords = toCanvasCoords(jd, ra, dec, inverseOrientQuat, st.bounds)
+    if (coords !== null) {
+        drawFunc(st, ...coords)
+    }
+}
 
 function render(st) {
     const inverseOrientQuat = Quaternions.inverse(st.orientQuat)
     const jd = toJd(Date.now())
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-
     for (const star of stars) {
         let { name, mag, ra, dec } = star
         if (mag < minVisibleMag) {
-            // celestial ra from hvg dataset is in hours, so times 15 to get degrees
-            const coords = toCanvasCoords(jd, ra*15, dec, inverseOrientQuat, st.bounds)
+            const coords = toCanvasCoords(jd, ra, dec, inverseOrientQuat, st.bounds)
             if (coords !== null) {
                 drawStar(st, name, mag, coords[0], coords[1])
             }
         }
     }
-    {
-        const moonLoc = eclipticToEquitorial(moonEclipLatLong(jd))
-        const coords = toCanvasCoords(jd, moonLoc.ra, moonLoc.dec, inverseOrientQuat, st.bounds)
-        if (coords !== null) {
-            drawMoon(st, ...coords)
-        }
-    }
-    {
-        const sunLoc = eclipticToEquitorial(sunEclipLatLong(jd, earth))
-        const coords = toCanvasCoords(jd, sunLoc.ra, sunLoc.dec, inverseOrientQuat, st.bounds)
-        if (coords !== null) {
-            drawSun(st, ...coords)
-        }
-    }
     
+    addObject(st, inverseOrientQuat, jd, moonEclipLatLong(jd), drawMoon);
+    addObject(st, inverseOrientQuat, jd, sunEclipLatLong(jd, earth), drawSun);
     for (const p of planets) {
         if (p.name !== "Earth") {
-            const planetLoc = eclipticToEquitorial(planetEclipLatLong(jd, p, earth))
-            const coords = toCanvasCoords(jd, planetLoc.ra, planetLoc.dec, inverseOrientQuat, st.bounds)
-            if (coords !== null) {
-                drawPlanet(st, p, ...coords)
-            }
+            addObject(st, inverseOrientQuat, jd, planetEclipLatLong(jd, p, earth), (st, x, y) => drawPlanet(st, p, x, y));
         }
     }
 }
-
 
 
 const maxStarSize = (st) => toPixelSize(0.3, st) 
@@ -349,11 +335,9 @@ const brighestStarMag = -1.46           // sirius
 const minVisibleMag = 6               // dimmest magnitude shown
 const magRange = -brighestStarMag + minVisibleMag
 
-
-
 // Start loading files for stars, planet data, and images
 const promises = []
-promises.push(fetch('./data/stars_vis.json').then(response => response.json()))
+promises.push(fetch('./data/stars.json').then(response => response.json()))
 promises.push(fetch('./data/planets.json').then(response => response.json()))
 const objects = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
 objects.forEach(obj => promises.push(loadImage(`./images/icons/${obj}.png`)))

@@ -148,9 +148,8 @@ const thetaToAz = (theta) => mod(-theta + 90, 360)
 
 // 0 -> 360 from top to 0->90, 0 to -90
 function azToTheta(azimuth) {
-    let theta = azimuth
-    theta = (theta - 90) % 360
-    return theta <= 180 ? -theta : 360 -theta
+    let theta = (azimuth - 90) % 360
+    return theta <= 180 ? -theta : 360 - theta
 }
 
 function toLatLongWest(latLong) {
@@ -158,8 +157,6 @@ function toLatLongWest(latLong) {
     const longWest = long < 0 ? -long : 360 - long
     return {lat: lat, long: longWest } 
 }
-
-
 
 // to vectors on unit sphere
 function to3Vec(alt, az) {
@@ -217,12 +214,8 @@ function planetEclipLatLong(jd, p, earth) {
     return { long: lambda, lat: beta } 
 }
 
-// TODO
-function toPixelSize(deg, visAngle) {
-    const hSphere = 2 * sin(visAngle / 2)
-    const wSphere = hSphere / heightToWidthRatio
-    const sphereToPixScale = height / hSphere
-    return sphereToPixScale * rad(deg)
+function toPixelSize(deg, st) {
+    return st.bounds.sphereToPixScale * rad(deg)
 }
 
 const drawImgCentered = (ctx, img, x, y, size) => ctx.drawImage(img, x-size/2, y-size/2, size, size)
@@ -231,13 +224,13 @@ function addTitle(st, ctx, x, y, text, color, font, pixSize) {
     ctx.font = font;
     ctx.textAlign = "center";
     ctx.fillStyle = color;
-    const textPixOffset = pixSize / 2 + toPixelSize(1, st.longVisAngle)
+    const textPixOffset = pixSize / 2 + toPixelSize(1, st)
     ctx.fillText(text, x, y + textPixOffset);
 }
 
 function drawStar(st, name, mag, x, y) {
     const percMagRange = (-mag + minVisibleMag) / magRange // flip [-1.46, 4.5] and map to [0, 1]
-    const imgRadius = percMagRange * (maxStarSize(st.longVisAngle) - minStarSize(st.longVisAngle)) + minStarSize(st.longVisAngle)
+    const imgRadius = percMagRange * (maxStarSize(st) - minStarSize(st)) + minStarSize(st)
     ctx.beginPath();
     ctx.arc(x, y, imgRadius, 0, 2 * Math.PI);
     ctx.fillStyle = 'white';
@@ -246,19 +239,19 @@ function drawStar(st, name, mag, x, y) {
 }
 
 function drawMoon(st, x, y) {
-    const pixSize = toPixelSize(2.5, st.longVisAngle)
+    const pixSize = toPixelSize(2.5, st)
     drawImgCentered(ctx, images.Moon, x, y, pixSize)
     addTitle(st, ctx, x, y, 'Moon', 'lightgreen', "20pt bold", pixSize);
 }
 
 function drawSun(st, x, y) {
-    const pixSize = toPixelSize(2.5, st.longVisAngle)
+    const pixSize = toPixelSize(2.5, st)
     drawImgCentered(ctx, images.Sun, x, y, pixSize) 
     addTitle(st, ctx, x, y, 'Sun', 'white', "20pt bold", pixSize);
 }
 
 function drawPlanet(st, p, x, y) {
-    const pixSize = toPixelSize(p.imgSize, st.longVisAngle)
+    const pixSize = toPixelSize(p.imgSize, st)
     drawImgCentered(ctx, images[p.name], x, y, pixSize) 
     addTitle(st, ctx, x, y, p.name, 'lightgreen', "20pt bold", pixSize);
 }
@@ -340,8 +333,8 @@ function render(st) {
 
 
 
-const maxStarSize = (visAngle) => toPixelSize(0.3, visAngle) 
-const minStarSize = (visAngle) => toPixelSize(0.01, visAngle)
+const maxStarSize = (st) => toPixelSize(0.3, st) 
+const minStarSize = (st) => toPixelSize(0.01, st)
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");

@@ -217,6 +217,132 @@ function planetEclipLatLong(jd, p, earth) {
     return { long: lambda, lat: beta } 
 }
 
+// TODO
+function toPixelSize(deg, visAngle) {
+    const hSphere = 2 * sin(visAngle / 2)
+    const wSphere = hSphere / heightToWidthRatio
+    const sphereToPixScale = height / hSphere
+    return sphereToPixScale * rad(deg)
+}
+
+const drawImgCentered = (ctx, img, x, y, size) => ctx.drawImage(img, x-size/2, y-size/2, size, size)
+
+function addTitle(st, ctx, x, y, text, color, font, pixSize) {
+    ctx.font = font;
+    ctx.textAlign = "center";
+    ctx.fillStyle = color;
+    const textPixOffset = pixSize / 2 + toPixelSize(1, st.longVisAngle)
+    ctx.fillText(text, x, y + textPixOffset);
+}
+
+function drawStar(st, name, mag, x, y) {
+    const percMagRange = (-mag + minVisibleMag) / magRange // flip [-1.46, 4.5] and map to [0, 1]
+    const imgRadius = percMagRange * (maxStarSize(st.longVisAngle) - minStarSize(st.longVisAngle)) + minStarSize(st.longVisAngle)
+    ctx.beginPath();
+    ctx.arc(x, y, imgRadius, 0, 2 * Math.PI);
+    ctx.fillStyle = 'white';
+    ctx.fill();
+    addTitle(st, ctx, x, y, name, 'white', "20pt bold", imgRadius);
+}
+
+function drawMoon(st, x, y) {
+    const pixSize = toPixelSize(2.5, st.longVisAngle)
+    drawImgCentered(ctx, images.Moon, x, y, pixSize)
+    addTitle(st, ctx, x, y, 'Moon', 'lightgreen', "20pt bold", pixSize);
+}
+
+function drawSun(st, x, y) {
+    const pixSize = toPixelSize(2.5, st.longVisAngle)
+    drawImgCentered(ctx, images.Sun, x, y, pixSize) 
+    addTitle(st, ctx, x, y, 'Sun', 'white', "20pt bold", pixSize);
+}
+
+function drawPlanet(st, p, x, y) {
+    const pixSize = toPixelSize(p.imgSize, st.longVisAngle)
+    drawImgCentered(ctx, images[p.name], x, y, pixSize) 
+    addTitle(st, ctx, x, y, p.name, 'lightgreen', "20pt bold", pixSize);
+}
+
+function computeBounds(longVisAngle) {
+    const distToPlane = cos(longVisAngle / 2)
+    const hSphere = 2 * sin(longVisAngle / 2)
+    const wSphere = hSphere / heightToWidthRatio
+    const sphereToPixScale = height / hSphere
+    const xBase = -wSphere/2, yBase = -hSphere/2
+    // more min/max larger than screen so off screen rendered cleanly as enters frame
+    const xMax = wSphere, xMin = -wSphere, yMax = hSphere, yMin = -hSphere
+    return { xBase, yBase, xMax, xMin, yMax, yMin, sphereToPixScale, distToPlane }
+}
+
+function toCanvasCoords(jd, ra, dec, inverseOrientQuat, bounds) {
+    const { altitude, azimuth} = getAltAz(jd, userLatLong, { ra, dec })
+    const vecOnSphere = to3Vec(altitude, azimuth)
+    const rotVecOnSphere = Quaternions.rotate(vecOnSphere, inverseOrientQuat).slice(1)
+    if (rotVecOnSphere[2] > 0) {
+        return null
+    }
+
+    //https://math.stackexchange.com/questions/3412199/how-to-calculate-the-intersection-point-of-a-vector-and-a-plane-defined-as-a-poi
+    const [x, y, z] = scalarMult(-bounds.distToPlane / rotVecOnSphere[2], rotVecOnSphere)
+    const inFrame = z < 0 && bounds.xMin <= x && x <= bounds.xMax && bounds.yMin <= y && y <= bounds.yMax
+    if (inFrame) {
+        const xPixOff = (x - bounds.xBase) * bounds.sphereToPixScale 
+        const yPixOff = (y - bounds.yBase) * bounds.sphereToPixScale 
+        return [xPixOff, height - yPixOff]
+    } else {
+        return null;
+    }
+}
+
+
+
+function render(st) {
+    const inverseOrientQuat = Quaternions.inverse(st.orientQuat)
+    const jd = toJd(Date.now())
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+
+    for (const star of stars) {
+        let { name, mag, ra, dec } = star
+        if (mag < minVisibleMag) {
+            // celestial ra from hvg dataset is in hours, so times 15 to get degrees
+            const coords = toCanvasCoords(jd, ra*15, dec, inverseOrientQuat, st.bounds)
+            if (coords !== null) {
+                drawStar(st, name, mag, coords[0], coords[1])
+            }
+        }
+    }
+    {
+        const moonLoc = eclipticToEquitorial(moonEclipLatLong(jd))
+        const coords = toCanvasCoords(jd, moonLoc.ra, moonLoc.dec, inverseOrientQuat, st.bounds)
+        if (coords !== null) {
+            drawMoon(st, ...coords)
+        }
+    }
+    {
+        const sunLoc = eclipticToEquitorial(sunEclipLatLong(jd, earth))
+        const coords = toCanvasCoords(jd, sunLoc.ra, sunLoc.dec, inverseOrientQuat, st.bounds)
+        if (coords !== null) {
+            drawSun(st, ...coords)
+        }
+    }
+    
+    for (const p of planets) {
+        if (p.name !== "Earth") {
+            const planetLoc = eclipticToEquitorial(planetEclipLatLong(jd, p, earth))
+            const coords = toCanvasCoords(jd, planetLoc.ra, planetLoc.dec, inverseOrientQuat, st.bounds)
+            if (coords !== null) {
+                drawPlanet(st, p, ...coords)
+            }
+        }
+    }
+}
+
+
+
+const maxStarSize = (visAngle) => toPixelSize(0.3, visAngle) 
+const minStarSize = (visAngle) => toPixelSize(0.01, visAngle)
+
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 canvas.width  = canvas.clientWidth;
@@ -226,129 +352,9 @@ const width = canvas.width
 const height = canvas.height
 const heightToWidthRatio = height / width
 
-
-
-
-let orientQuat = [0, 1, 1, 1]
-let longVisAngle = 90 // start with 1/4 screen visible
-
-
-
-function toPixelSize(deg, visAngle) {
-    const hSphere = 2 * sin(visAngle / 2)
-    const wSphere = hSphere / heightToWidthRatio
-    const sphereToPixScale = height / hSphere
-    return sphereToPixScale * rad(deg)
-}
-const maxStarSize = (visAngle) => toPixelSize(0.3, visAngle) 
-const minStarSize = (visAngle) => toPixelSize(0.01, visAngle)
-
-const drawImgCentered = (ctx, img, x, y, size) => ctx.drawImage(img, x-size/2, y-size/2, size, size)
 const brighestStarMag = -1.46           // sirius
 const minVisibleMag = 6               // dimmest magnitude shown
 const magRange = -brighestStarMag + minVisibleMag
-
-
-function addTitle(ctx, x, y, text, color, font, pixSize) {
-    ctx.font = font;
-    ctx.textAlign = "center";
-    ctx.fillStyle = color;
-    const textPixOffset = pixSize / 2 + toPixelSize(1, longVisAngle)
-    ctx.fillText(text, x, y + textPixOffset);
-}
-
-function drawStar(name, mag, x, y) {
-    const percMagRange = (-mag + minVisibleMag) / magRange // flip [-1.46, 4.5] and map to [0, 1]
-    const imgRadius = percMagRange * (maxStarSize(longVisAngle) - minStarSize(longVisAngle)) + minStarSize(longVisAngle)
-    ctx.beginPath();
-    ctx.arc(x, y, imgRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = 'white';
-    ctx.fill();
-    addTitle(ctx, x, y, name, 'white', "20pt bold", imgRadius);
-}
-
-function drawMoon(x, y) {
-    const pixSize = toPixelSize(2.5, longVisAngle)
-    drawImgCentered(ctx, images.Moon, x, y, pixSize)
-    addTitle(ctx, x, y, 'Moon', 'lightgreen', "20pt bold", pixSize);
-}
-
-function drawSun(x, y) {
-    const pixSize = toPixelSize(2.5, longVisAngle)
-    drawImgCentered(ctx, images.Sun, x, y, pixSize) 
-    addTitle(ctx, x, y, 'Sun', 'white', "20pt bold", pixSize);
-}
-
-function drawPlanet(p, x, y) {
-    const pixSize = toPixelSize(p.imgSize, longVisAngle)
-    drawImgCentered(ctx, images[p.name], x, y, pixSize) 
-    addTitle(ctx, x, y, p.name, 'lightgreen', "20pt bold", pixSize);
-}
-
-function toCanvasCoords(jd, ra, dec, inverseOrientQuat) {
-    const { altitude, azimuth} = getAltAz(jd, userLatLong, { ra, dec })
-    const vecOnSphere = to3Vec(altitude, azimuth)
-    const rotVecOnSphere = Quaternions.rotate(vecOnSphere, inverseOrientQuat).slice(1)
-    if (rotVecOnSphere[2] > 0) {
-        return null
-    }
-
-    // TODO only recompute on resize
-    const distToPlane = cos(longVisAngle / 2)
-    const hSphere = 2 * sin(longVisAngle / 2)
-    const wSphere = hSphere / heightToWidthRatio
-    const sphereToPixScale = height / hSphere
-    const xBase = -wSphere/2, yBase = -hSphere/2
-    // more min/max larger than screen so off screen rendered cleanly as enters frame
-    const xMax = wSphere, xMin = -wSphere, yMax = hSphere, yMin = -hSphere
-    
-    //https://math.stackexchange.com/questions/3412199/how-to-calculate-the-intersection-point-of-a-vector-and-a-plane-defined-as-a-poi
-    const [x, y, z] = scalarMult(-distToPlane / rotVecOnSphere[2], rotVecOnSphere)
-    const inFrame = z < 0 && xMin <= x && x <= xMax && yMin <= y && y <= yMax
-    if (inFrame) {
-        const xPixOff = (x - xBase) * sphereToPixScale 
-        const yPixOff = (y - yBase) * sphereToPixScale 
-        return [xPixOff, height - yPixOff]
-    } else {
-        return null;
-    }
-}
-
-
-// https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events/Pinch_zoom_gestures
-class PinchZoom {
-    evCache = {}
-
-    setPointer(ev) {
-        this.evCache[ev.pointerId] = ev
-    }
-
-    removePointer(ev) {
-        delete this.evCache[ev.pointerId]
-    }
-
-    onMoveHandler(ev) {
-        if (Object.keys(this.evCache).length == 2) {
-            const [a1, b1] = Object.values(this.evCache)
-            const prevPixDist = euclideanDist(a1.clientX, a1.clientY, b1.clientX, b1.clientY)
-            const prevDegDist = longVisAngle * (prevPixDist / height)
-            this.setPointer(ev)
-            const [a2, b2] = Object.values(this.evCache)
-            const currPixDist = euclideanDist(a2.clientX, a2.clientY, b2.clientX, b2.clientY)
-            const newLongVisAngle = Math.min(90, prevDegDist * (height / currPixDist)) 
-            longVisAngle = newLongVisAngle // TODO global
-            render(orientQuat)
-        } else {
-            this.setPointer(ev)
-        }
-    }
-
-    setHandlers(el) {
-        el.onpointermove = (ev) => this.onMoveHandler(ev)
-        el.onpointerdown = (ev) => this.setPointer(ev)
-        el.onpointerup = el.onpointercancel = el.onpointerout = el.onpointerleave = (ev) => this.removePointer(ev);
-    }
-}
 
 
 
@@ -374,94 +380,86 @@ const userLoc = await getPosition()
 const userLatLong = { lat: userLoc.coords.latitude, long: userLoc.coords.longitude }
 
 
-function render(orientQuat) {
-    const inverseOrientQuat = Quaternions.inverse(orientQuat)
-    const jd = toJd(Date.now())
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    for (const star of stars) {
-        let { name, mag, ra, dec } = star
-        if (mag < minVisibleMag) {
-            // celestial ra from hvg dataset is in hours, so times 15 to get degrees
-            const coords = toCanvasCoords(jd, ra*15, dec, inverseOrientQuat)
-            if (coords !== null) {
-                drawStar(name, mag, coords[0], coords[1])
-            }
-        }
-    }
-    {
-        const moonLoc = eclipticToEquitorial(moonEclipLatLong(jd))
-        const coords = toCanvasCoords(jd, moonLoc.ra, moonLoc.dec, inverseOrientQuat)
-        if (coords !== null) {
-            drawMoon(...coords)
-        }
-    }
-    {
-        const sunLoc = eclipticToEquitorial(sunEclipLatLong(jd, earth))
-        const coords = toCanvasCoords(jd, sunLoc.ra, sunLoc.dec, inverseOrientQuat)
-        if (coords !== null) {
-            drawSun(...coords)
-        }
-    }
-    
-    for (const p of planets) {
-        if (p.name !== "Earth") {
-            const planetLoc = eclipticToEquitorial(planetEclipLatLong(jd, p, earth))
-            const coords = toCanvasCoords(jd, planetLoc.ra, planetLoc.dec, inverseOrientQuat)
-            if (coords !== null) {
-                drawPlanet(p, ...coords)
-            }
-        }
-    }
-}
-
-
+// Global mutable state
+const state = {} 
+// degrees of sky covered by long edge of screen 
+state.longVisAngle = 90
+// quaternion describing current phone orientation
+state.orientQuat = [0, 0, 0, 0]
 // iPhone saves offset quaternion between relative north and absolute north
-let northOffsetQuat = null 
+state.northOffsetQuat = null
+// data derived from longVisAngle, held in state for efficiency
+state.bounds = computeBounds(state.longVisAngle)
+// cache of pointer events for zooming 
+state.evCache = {}
 
-function iOSGetOrientationPerms() {
+
+// All functions that access state object directly are below this point
+function iosRenderOnOrientChange() {
     document.getElementById("request-perms").style.display = 'none';
-
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission(true)
+      DeviceOrientationEvent.requestPermission()
         .then(permissionState => {
           if (permissionState === 'granted') {
             window.addEventListener('deviceorientation', () => {
                 const relativeQuat = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
-                if (northOffsetQuat === null) {
+                if (state.northOffsetQuat === null) {
                     const phoneNorth = [0, 1, 0]
                     const northRotated = Quaternions.rotate(phoneNorth, relativeQuat).slice(1)
                     const thetaRelativeNorth = atan2(northRotated[1], northRotated[0])
                     const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
                     const bearingDiff = event.webkitCompassHeading - bearingRelativeNorth 
-                    northOffsetQuat = Quaternions.fromAngleAxis(bearingDiff, [0, 0, -1]) 
+                    state.northOffsetQuat = Quaternions.fromAngleAxis(bearingDiff, [0, 0, -1]) 
                 }
-                orientQuat = Quaternions.multiply(northOffsetQuat, relativeQuat)
-                render(orientQuat)
-            }, true);
+                state.orientQuat = Quaternions.multiply(state.northOffsetQuat, relativeQuat)
+                render(state)
+            });
           }
         })
         .catch(console.error);
     } 
 }
 
-const isIOS = () => /(iPad|iPhone)/g.test(navigator.userAgent)
-if (isIOS()) {
-    const allowButton = document.getElementById("request-perms")
-    allowButton.style.display = 'block';
-    allowButton.onclick = iOSGetOrientationPerms;
-} else {
+
+function androidRenderOnOrientChange() {
     const options = { frequency: 30, referenceFrame: "device" };
     const sensor = new AbsoluteOrientationSensor(options);
     sensor.start();
     sensor.addEventListener("reading", () => {
-        orientQuat = Quaternions.toInternalQuat(sensor.quaternion)
-        render(orientQuat)
+        state.orientQuat = Quaternions.toInternalQuat(sensor.quaternion)
+        render(state)
      });
     sensor.addEventListener("error", (error) => console.log(error));
 }
 
-const pinchZoom = new PinchZoom();
-pinchZoom.setHandlers(document.getElementById("canvas"));
+// Render on orientation change
+if (/(iPad|iPhone)/g.test(navigator.userAgent)) {
+    const allowButton = document.getElementById("request-perms")
+    allowButton.style.display = 'block';
+    allowButton.onclick = iosRenderOnOrientChange;
+} else {
+    androidRenderOnOrientChange() 
+}
+
+// Render on zoom in/out
+// https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events/Pinch_zoom_gestures
+canvas.onpointerdown = (ev) => { state.evCache[ev.pointerId] = ev }
+canvas.onpointerup = canvas.onpointercancel = canvas.onpointerout = canvas.onpointerleave = (ev) => { delete state.evCache[ev.pointerId] };
+canvas.onpointermove = canvas.onpointermove = (ev) => {
+    if (Object.keys(state.evCache).length == 2) {
+        const [a1, b1] = Object.values(state.evCache)
+        const prevPixDist = euclideanDist(a1.clientX, a1.clientY, b1.clientX, b1.clientY)
+        const prevDegDist = state.longVisAngle * (prevPixDist / height)
+        state.evCache[ev.pointerId] = ev
+        const [a2, b2] = Object.values(state.evCache)
+        const currPixDist = euclideanDist(a2.clientX, a2.clientY, b2.clientX, b2.clientY)
+        const newLongVisAngle = Math.min(90, prevDegDist * (height / currPixDist)) 
+        state.longVisAngle = newLongVisAngle // TODO global
+        state.bounds = computeBounds(state.longVisAngle)
+        render(state)
+    } else {
+        state.evCache[ev.pointerId] = ev
+    }
+}
 
 

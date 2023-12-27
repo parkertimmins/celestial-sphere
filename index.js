@@ -18,7 +18,6 @@ const sin = (deg) => Math.sin(rad(deg)),
       atan = (x) => degree(Math.atan(x)), 
       atan2 = (x, y) => degree(Math.atan2(x, y));
 
-
 // Simple vector functions
 const sum = (arr) => arr.reduce((a, b) => a+b, 0)
 const squaredNorm = (v) => sum(v.map(e => e*e))
@@ -105,53 +104,6 @@ class Quaternions {
     }
 }
 
-
-
-
-function getActualHeading(quat) {
-    const phoneNorth = [0, 1, 0]
-    const northOrient = Quaternions.rotate(phoneNorth, quat).slice(1)
-    const thetaRelativeNorth = atan2(northOrient[1], northOrient[0])
-    const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
-    return bearingRelativeNorth 
-}
-
-var degtorad = Math.PI / 180; // Degree-to-Radian conversion
-function getCompassHeading( alpha, beta, gamma ) {
-
-  var _x = beta  ? beta  * degtorad : 0; // beta value
-  var _y = gamma ? gamma * degtorad : 0; // gamma value
-  var _z = alpha ? alpha * degtorad : 0; // alpha value
-
-  var cX = Math.cos( _x );
-  var cY = Math.cos( _y );
-  var cZ = Math.cos( _z );
-  var sX = Math.sin( _x );
-  var sY = Math.sin( _y );
-  var sZ = Math.sin( _z );
-
-  // Calculate Vx and Vy components
-  //var Vx = - cZ * sY - sZ * sX * cY;
-  //var Vy = - sZ * sY + cZ * sX * cY;
-
-  var Vx = - cX * sZ
-  var Vy = cZ * cX
-
-  // Calculate compass heading
-  var compassHeading = Math.atan( Vx / Vy );
-
-  // Convert compass heading to use whole unit circle
-  if( Vy < 0 ) {
-    compassHeading += Math.PI;
-  } else if( Vx < 0 ) {
-    compassHeading += 2 * Math.PI;
-  }
-
-  return compassHeading * ( 180 / Math.PI ); // Compass Heading (in degrees)
-
-}
-
-
 // https://www.movable-type.co.uk/scripts/gis-faq-5.1.html
 // returns angle of arc subtended by earth
 // returns non-negatives value
@@ -165,7 +117,6 @@ function haversineDist(p1, p2) {
 // since we are looking for the place at solar noon,  
 // and hour angle H = 0 = side real time - right ascension, side real time == ra  
 const raToLong = (jd, ra) => (280.1470 + 360.9856235 * (jd - j2000jd) - ra) % 360
-
 
 // https://www.movable-type.co.uk/scripts/latlong.html - Bearing
 // http://mathforum.org/library/drmath/view/55417.html
@@ -202,13 +153,6 @@ function azToTheta(azimuth) {
     return theta <= 180 ? -theta : 360 -theta
 }
 
-// to vectors on unit sphere
-function to3Vec(alt, az) {
-    const b = cos(alt)
-    const theta = azToTheta(az)
-    return [b*cos(theta), b*sin(theta), sin(alt)] 
-}
-
 function toLatLongWest(latLong) {
     const {lat, long} = latLong
     const longWest = long < 0 ? -long : 360 - long
@@ -216,10 +160,17 @@ function toLatLongWest(latLong) {
 }
 
 
+
+// to vectors on unit sphere
+function to3Vec(alt, az) {
+    const b = cos(alt)
+    const theta = azToTheta(az)
+    return [b*cos(theta), b*sin(theta), sin(alt)] 
+}
+
 function getPosition() {
     return new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject))
 }
-
 const loadImage = (url) => new Promise((resolve, reject) => {
   const img = new Image();
   img.addEventListener('load', () => resolve(img));
@@ -363,76 +314,57 @@ function toCanvasCoords(jd, ra, dec, inverseOrientQuat) {
     }
 }
 
+
 // https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events/Pinch_zoom_gestures
 class PinchZoom {
-    constructor(element) {
-        this.evCache = []
+    evCache = {}
+
+    setPointer(ev) {
+        this.evCache[ev.pointerId] = ev
     }
 
-    removeEvent(ev) {
-        const index = this.evCache.findIndex((cachedEv) => cachedEv.pointerId === ev.pointerId)
-        if (index >= 0) {
-            this.evCache.splice(index, 1)
-        }
-    }
-
-    replaceEvent(ev) {
-        const index = this.evCache.findIndex((cachedEv) => cachedEv.pointerId === ev.pointerId);
-        if (index >= 0) {
-            this.evCache[index] = ev;
-        }
-    }
-
-    onDownHandler(ev) {
-        this.evCache.push(ev);
-    }
-
-    onUpHandler(ev) {
-        this.removeEvent(ev)
+    removePointer(ev) {
+        delete this.evCache[ev.pointerId]
     }
 
     onMoveHandler(ev) {
-        if (this.evCache.length == 2) {
-            const prevPixDist = euclideanDist(this.evCache[0].clientX, this.evCache[0].clientY, this.evCache[1].clientX, this.evCache[1].clientY)
+        if (Object.keys(this.evCache).length == 2) {
+            const [a1, b1] = Object.values(this.evCache)
+            const prevPixDist = euclideanDist(a1.clientX, a1.clientY, b1.clientX, b1.clientY)
             const prevDegDist = longVisAngle * (prevPixDist / height)
-            this.replaceEvent(ev)
-            const currPixDist = euclideanDist(this.evCache[0].clientX, this.evCache[0].clientY, this.evCache[1].clientX, this.evCache[1].clientY)
+            this.setPointer(ev)
+            const [a2, b2] = Object.values(this.evCache)
+            const currPixDist = euclideanDist(a2.clientX, a2.clientY, b2.clientX, b2.clientY)
             const newLongVisAngle = Math.min(90, prevDegDist * (height / currPixDist)) 
             longVisAngle = newLongVisAngle // TODO global
             render(orientQuat)
         } else {
-            this.replaceEvent(ev)
+            this.setPointer(ev)
         }
     }
 
     setHandlers(el) {
-        el.onpointerdown = (ev) => this.onDownHandler(ev)
         el.onpointermove = (ev) => this.onMoveHandler(ev)
-        el.onpointerup = el.onpointercancel = el.onpointerout = el.onpointerleave = (ev) => this.onUpHandler(ev);
+        el.onpointerdown = (ev) => this.setPointer(ev)
+        el.onpointerup = el.onpointercancel = el.onpointerout = el.onpointerleave = (ev) => this.removePointer(ev);
     }
 }
 
 
 
-
-
-
-const objects = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
+// Start loading files for stars, planet data, and images
 const promises = []
-
 promises.push(fetch('./data/stars_vis.json').then(response => response.json()))
 promises.push(fetch('./data/planets.json').then(response => response.json()))
-for (const obj of objects) {
-    promises.push(loadImage('./images/icons/' + obj + '.png'))
-}
+const objects = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
+objects.forEach(obj => promises.push(loadImage(`./images/icons/${obj}.png`)))
 
 
+// Wait till files load 
 const resolved = await Promise.all(promises)
 const stars = resolved[0]
 const planets = resolved[1]
 const earth = planets.filter((p) => p.name === "Earth")[0]
-
-
 const images = {}
 for (let i = 0; i < objects.length; i++) {
     images[objects[i]] = resolved[i+2]

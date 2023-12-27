@@ -534,6 +534,10 @@ function render(orientQuat) {
     }
 }
 
+
+// iPhone saves offset quaternion between relative north and absolute north
+let northOffsetQuat = null 
+
 function iOSGetOrientationPerms() {
     document.getElementById("request-perms").style.display = 'none';
 
@@ -542,15 +546,16 @@ function iOSGetOrientationPerms() {
         .then(permissionState => {
           if (permissionState === 'granted') {
             window.addEventListener('deviceorientation', () => {
-                console.log(event.absolute, event.alpha, event.beta, event.gamma, event.webkitCompassHeading)
                 const relativeQuat = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
-                const phoneNorth = [0, 1, 0]
-                const relativeNorth = Quaternions.rotate(phoneNorth, relativeQuat).slice(1)
-                const thetaRelativeNorth = atan2(afterRot[1], afterRot[0])
-                const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
-                const bearingDiff = event.webkitCompassHeading - bearingRelativeNorth 
-                const rotToActualNorth = Quaternions.fromAngleAxis(bearingDiff, [0, 0, 1]) 
-                orientQuat = Quaternions.multiply(rotToActualNorth, relativeQuat)
+                if (northOffsetQuat === null) {
+                    const phoneNorth = [0, 1, 0]
+                    const northRotated = Quaternions.rotate(phoneNorth, relativeQuat).slice(1)
+                    const thetaRelativeNorth = atan2(northRotated[1], northRotated[0])
+                    const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
+                    const bearingDiff = event.webkitCompassHeading - bearingRelativeNorth 
+                    northOffsetQuat = Quaternions.fromAngleAxis(bearingDiff, [0, 0, -1]) 
+                }
+                orientQuat = Quaternions.multiply(northOffsetQuat, relativeQuat)
                 render(orientQuat)
             }, true);
           }
@@ -559,63 +564,21 @@ function iOSGetOrientationPerms() {
     } 
 }
 
-let compassHeading = 0
-let downVecPhoneFrame = [0, 0, -1]
 
-let dirQuat = [0, 0, 0, 0]
+
+
+
 if (isIOS()) {
     const allowButton = document.getElementById("request-perms")
     allowButton.style.display = 'block';
     allowButton.onclick = iOSGetOrientationPerms;
 } else {
-
-   window.addEventListener('deviceorientation', () => {
-        const compassHeading = getActualHeading(dirQuat)
-      //  console.log('heading', compassHeading) 
-      // console.log(event.absolute, event.alpha, event.beta, event.gamma, event.webkitCompassHeading)
-
-
-        const relativeQuat = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
-        const phoneNorth = [0, 1, 0]
-        const northRotated = Quaternions.rotate(phoneNorth, relativeQuat).slice(1)
-        const thetaRelativeNorth = atan2(northRotated[1], northRotated[0])
-        const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
-        const bearingDiff = compassHeading - bearingRelativeNorth 
-     //  console.log('bearingRelativeNorth', bearingRelativeNorth )
-       console.log('bearingDiff ', bearingDiff);
-        const rotToActualNorth = Quaternions.fromAngleAxis(bearingDiff, [0, 0, -1]) 
-        orientQuat = Quaternions.multiply(rotToActualNorth, relativeQuat)
-
-       // console.log('dir quat', dirQuat)
-        //console.log('ori quat', orientQuat)
-        render(orientQuat)
-   });
-
- 
-
-
-    /*
-   window.addEventListener('deviceorientation', () => {
-        compassHeading  = getCompassHeading(event.alpha, event.beta, event.gamma)
-        orientQuat = buildOrientQuat(compassHeading, downVecPhoneFrame)
-        console.log('heading', compassHeading) 
-        render(orientQuat)
-   });
-
-    window.addEventListener('devicemotion', () => {
-        const noGrav = event.acceleration
-        const withGrav = event.accelerationIncludingGravity
-        downVecPhoneFrame = [noGrav.x - withGrav.x, noGrav.y - withGrav.y, noGrav.z - withGrav.z]
-    });
-   
-    */
     const options = { frequency: 30, referenceFrame: "device" };
     const sensor = new AbsoluteOrientationSensor(options);
     sensor.start();
     sensor.addEventListener("reading", () => {
-        dirQuat = Quaternions.toInternalQuat(sensor.quaternion)
-        //orientQuat = Quaternions.toInternalQuat(sensor.quaternion)
-        //render(orientQuat)
+        orientQuat = Quaternions.toInternalQuat(sensor.quaternion)
+        render(orientQuat)
      });
     sensor.addEventListener("error", (error) => console.log(error));
 }

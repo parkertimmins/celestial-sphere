@@ -19,6 +19,7 @@ const sin = (deg) => Math.sin(rad(deg)),
       atan2 = (x, y) => degree(Math.atan2(x, y));
 
 
+// Simple vector functions
 const sum = (arr) => arr.reduce((a, b) => a+b, 0)
 const squaredNorm = (v) => sum(v.map(e => e*e))
 const norm = (v) => Math.sqrt(squaredNorm(v))
@@ -26,6 +27,11 @@ const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1
 const dot = (a, b) => sum(a.map((x, i) => x*b[i]))
 const scalarMult = (a, v) => v.map((x, i) => a * x)
 const euclideanDist = (x1, y1, x2, y2) => Math.sqrt((x2-x1)**2 + (y2-y1)**2)
+
+function normalize(v) {
+    const l = norm(v)
+    return v.map(a => a / l)
+}
 
 
 // Originally from most recent Astronomical Almanac, at least 1999-2015
@@ -105,6 +111,91 @@ class Quaternions {
     }
 }
 
+
+
+
+function getActualHeading(quat) {
+    const phoneNorth = [0, 1, 0]
+    const northOrient = Quaternions.rotate(phoneNorth, quat).slice(1)
+    const thetaRelativeNorth = atan2(northOrient[1], northOrient[0])
+    const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
+    return bearingRelativeNorth 
+}
+
+var degtorad = Math.PI / 180; // Degree-to-Radian conversion
+function getCompassHeading( alpha, beta, gamma ) {
+
+  var _x = beta  ? beta  * degtorad : 0; // beta value
+  var _y = gamma ? gamma * degtorad : 0; // gamma value
+  var _z = alpha ? alpha * degtorad : 0; // alpha value
+
+  var cX = Math.cos( _x );
+  var cY = Math.cos( _y );
+  var cZ = Math.cos( _z );
+  var sX = Math.sin( _x );
+  var sY = Math.sin( _y );
+  var sZ = Math.sin( _z );
+
+  // Calculate Vx and Vy components
+  //var Vx = - cZ * sY - sZ * sX * cY;
+  //var Vy = - sZ * sY + cZ * sX * cY;
+
+  var Vx = - cX * sZ
+  var Vy = cZ * cX
+
+  // Calculate compass heading
+  var compassHeading = Math.atan( Vx / Vy );
+
+  // Convert compass heading to use whole unit circle
+  if( Vy < 0 ) {
+    compassHeading += Math.PI;
+  } else if( Vx < 0 ) {
+    compassHeading += 2 * Math.PI;
+  }
+
+  return compassHeading * ( 180 / Math.PI ); // Compass Heading (in degrees)
+
+}
+
+
+function buildOrientQuat(compassHeading, downVecInPhoneFrame) {
+    const phoneBack = [0, 0, -1]
+    const downVec = normalize(downVecInPhoneFrame)
+
+    const axis = cross(downVec, phoneBack)
+    const axisUnit = normalize(axis)
+    const axisLen = Math.sqrt(sum(axis.map(a => a*a)))
+    const theta = atan(axisLen/dot(downVec, phoneBack))
+    const rotQuat = Quaternions.fromAngleAxis(theta, axisUnit)
+    const phoneNorth = [0, 1, 0]
+    const afterRot = Quaternions.rotate(phoneNorth, rotQuat).slice(1)
+
+    console.log('phone north rotated by down vec', afterRot)
+    const lambda = atan2(afterRot[1], afterRot[0])
+
+    const lambdaBearing = thetaToAz(lambda)
+    console.log('compassHeading', compassHeading)
+    console.log('lambdaBearing', lambdaBearing)
+    const bearingDiff = compassHeading - lambdaBearing
+    console.log('bearingDiff', bearingDiff)
+    const aroundPole = Quaternions.fromAngleAxis(bearingDiff, [0, 0, 1]) // default back
+    const finalRot = Quaternions.multiply(aroundPole, rotQuat)
+
+    console.log('i(x) rot', Quaternions.rotate([1, 0, 0], finalRot).slice(1))
+    console.log('j(y) rot', Quaternions.rotate([0, 1, 0], finalRot).slice(1))
+    console.log('k(z) rot', Quaternions.rotate([0, 0, 1], finalRot).slice(1))
+
+    console.log('after rot Quat')
+    console.log('i(x) rot', Quaternions.rotate([1, 0, 0], rotQuat).slice(1))
+    console.log('j(y) rot', Quaternions.rotate([0, 1, 0], rotQuat).slice(1))
+    console.log('k(z) rot', Quaternions.rotate([0, 0, 1], rotQuat).slice(1))
+
+    console.log('after around pole too')
+    console.log('i(x) rot', Quaternions.rotate(Quaternions.rotate([1, 0, 0], rotQuat).slice(1), aroundPole).slice(1))
+    console.log('j(y) rot', Quaternions.rotate(Quaternions.rotate([0, 1, 0], rotQuat).slice(1), aroundPole).slice(1))
+    console.log('k(z) rot', Quaternions.rotate(Quaternions.rotate([0, 0, 1], rotQuat).slice(1), aroundPole).slice(1))
+    return finalRot
+}
 
 // https://www.movable-type.co.uk/scripts/gis-faq-5.1.html
 // returns angle of arc subtended by earth
@@ -452,9 +543,15 @@ function iOSGetOrientationPerms() {
           if (permissionState === 'granted') {
             window.addEventListener('deviceorientation', () => {
                 console.log(event.absolute, event.alpha, event.beta, event.gamma, event.webkitCompassHeading)
-                const q = Quaternions.fromAngles(-event.webkitCompassHeading, event.beta, event.gamma)
-                console.log('quat', q[0], q[1], q[2], q[3])
-                render(q)
+                const relativeQuat = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
+                const phoneNorth = [0, 1, 0]
+                const relativeNorth = Quaternions.rotate(phoneNorth, relativeQuat).slice(1)
+                const thetaRelativeNorth = atan2(afterRot[1], afterRot[0])
+                const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
+                const bearingDiff = event.webkitCompassHeading - bearingRelativeNorth 
+                const rotToActualNorth = Quaternions.fromAngleAxis(bearingDiff, [0, 0, 1]) 
+                orientQuat = Quaternions.multiply(rotToActualNorth, relativeQuat)
+                render(orientQuat)
             }, true);
           }
         })
@@ -462,21 +559,63 @@ function iOSGetOrientationPerms() {
     } 
 }
 
+let compassHeading = 0
+let downVecPhoneFrame = [0, 0, -1]
+
+let dirQuat = [0, 0, 0, 0]
 if (isIOS()) {
     const allowButton = document.getElementById("request-perms")
     allowButton.style.display = 'block';
     allowButton.onclick = iOSGetOrientationPerms;
 } else {
+
+   window.addEventListener('deviceorientation', () => {
+        const compassHeading = getActualHeading(dirQuat)
+      //  console.log('heading', compassHeading) 
+      // console.log(event.absolute, event.alpha, event.beta, event.gamma, event.webkitCompassHeading)
+
+
+        const relativeQuat = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
+        const phoneNorth = [0, 1, 0]
+        const northRotated = Quaternions.rotate(phoneNorth, relativeQuat).slice(1)
+        const thetaRelativeNorth = atan2(northRotated[1], northRotated[0])
+        const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
+        const bearingDiff = compassHeading - bearingRelativeNorth 
+     //  console.log('bearingRelativeNorth', bearingRelativeNorth )
+       console.log('bearingDiff ', bearingDiff);
+        const rotToActualNorth = Quaternions.fromAngleAxis(bearingDiff, [0, 0, -1]) 
+        orientQuat = Quaternions.multiply(rotToActualNorth, relativeQuat)
+
+       // console.log('dir quat', dirQuat)
+        //console.log('ori quat', orientQuat)
+        render(orientQuat)
+   });
+
+ 
+
+
+    /*
+   window.addEventListener('deviceorientation', () => {
+        compassHeading  = getCompassHeading(event.alpha, event.beta, event.gamma)
+        orientQuat = buildOrientQuat(compassHeading, downVecPhoneFrame)
+        console.log('heading', compassHeading) 
+        render(orientQuat)
+   });
+
+    window.addEventListener('devicemotion', () => {
+        const noGrav = event.acceleration
+        const withGrav = event.accelerationIncludingGravity
+        downVecPhoneFrame = [noGrav.x - withGrav.x, noGrav.y - withGrav.y, noGrav.z - withGrav.z]
+    });
+   
+    */
     const options = { frequency: 30, referenceFrame: "device" };
     const sensor = new AbsoluteOrientationSensor(options);
     sensor.start();
     sensor.addEventListener("reading", () => {
-        orientQuat = Quaternions.toInternalQuat(sensor.quaternion)
-
-        //const decFix = Quaternions.fromAngleAxis(2.8, [0, 0, -1])
-        //const q = Quaternions.multiply(orientQuat, decFix)
-
-        render(orientQuat)
+        dirQuat = Quaternions.toInternalQuat(sensor.quaternion)
+        //orientQuat = Quaternions.toInternalQuat(sensor.quaternion)
+        //render(orientQuat)
      });
     sensor.addEventListener("error", (error) => console.log(error));
 }

@@ -28,12 +28,6 @@ const dot = (a, b) => sum(a.map((x, i) => x*b[i]))
 const scalarMult = (a, v) => v.map((x, i) => a * x)
 const euclideanDist = (x1, y1, x2, y2) => Math.sqrt((x2-x1)**2 + (y2-y1)**2)
 
-function normalize(v) {
-    const l = norm(v)
-    return v.map(a => a / l)
-}
-
-
 // Originally from most recent Astronomical Almanac, at least 1999-2015
 // An Alternative Lunar Ephemeris Model
 // https://caps.gsfc.nasa.gov/simpson/pubs/slunar.pdf
@@ -157,45 +151,6 @@ function getCompassHeading( alpha, beta, gamma ) {
 
 }
 
-
-function buildOrientQuat(compassHeading, downVecInPhoneFrame) {
-    const phoneBack = [0, 0, -1]
-    const downVec = normalize(downVecInPhoneFrame)
-
-    const axis = cross(downVec, phoneBack)
-    const axisUnit = normalize(axis)
-    const axisLen = Math.sqrt(sum(axis.map(a => a*a)))
-    const theta = atan(axisLen/dot(downVec, phoneBack))
-    const rotQuat = Quaternions.fromAngleAxis(theta, axisUnit)
-    const phoneNorth = [0, 1, 0]
-    const afterRot = Quaternions.rotate(phoneNorth, rotQuat).slice(1)
-
-    console.log('phone north rotated by down vec', afterRot)
-    const lambda = atan2(afterRot[1], afterRot[0])
-
-    const lambdaBearing = thetaToAz(lambda)
-    console.log('compassHeading', compassHeading)
-    console.log('lambdaBearing', lambdaBearing)
-    const bearingDiff = compassHeading - lambdaBearing
-    console.log('bearingDiff', bearingDiff)
-    const aroundPole = Quaternions.fromAngleAxis(bearingDiff, [0, 0, 1]) // default back
-    const finalRot = Quaternions.multiply(aroundPole, rotQuat)
-
-    console.log('i(x) rot', Quaternions.rotate([1, 0, 0], finalRot).slice(1))
-    console.log('j(y) rot', Quaternions.rotate([0, 1, 0], finalRot).slice(1))
-    console.log('k(z) rot', Quaternions.rotate([0, 0, 1], finalRot).slice(1))
-
-    console.log('after rot Quat')
-    console.log('i(x) rot', Quaternions.rotate([1, 0, 0], rotQuat).slice(1))
-    console.log('j(y) rot', Quaternions.rotate([0, 1, 0], rotQuat).slice(1))
-    console.log('k(z) rot', Quaternions.rotate([0, 0, 1], rotQuat).slice(1))
-
-    console.log('after around pole too')
-    console.log('i(x) rot', Quaternions.rotate(Quaternions.rotate([1, 0, 0], rotQuat).slice(1), aroundPole).slice(1))
-    console.log('j(y) rot', Quaternions.rotate(Quaternions.rotate([0, 1, 0], rotQuat).slice(1), aroundPole).slice(1))
-    console.log('k(z) rot', Quaternions.rotate(Quaternions.rotate([0, 0, 1], rotQuat).slice(1), aroundPole).slice(1))
-    return finalRot
-}
 
 // https://www.movable-type.co.uk/scripts/gis-faq-5.1.html
 // returns angle of arc subtended by earth
@@ -392,14 +347,16 @@ function toCanvasCoords(jd, ra, dec, inverseOrientQuat) {
     const hSphere = 2 * sin(longVisAngle / 2)
     const wSphere = hSphere / heightToWidthRatio
     const sphereToPixScale = height / hSphere
-    const xMax = wSphere/2, xMin = -wSphere/2, yMax = hSphere/2, yMin = -hSphere/2
+    const xBase = -wSphere/2, yBase = -hSphere/2
+    // more min/max larger than screen so off screen rendered cleanly as enters frame
+    const xMax = wSphere, xMin = -wSphere, yMax = hSphere, yMin = -hSphere
     
     //https://math.stackexchange.com/questions/3412199/how-to-calculate-the-intersection-point-of-a-vector-and-a-plane-defined-as-a-poi
     const [x, y, z] = scalarMult(-distToPlane / rotVecOnSphere[2], rotVecOnSphere)
     const inFrame = z < 0 && xMin <= x && x <= xMax && yMin <= y && y <= yMax
     if (inFrame) {
-        const xPixOff = (x - xMin) * sphereToPixScale 
-        const yPixOff = (y - yMin) * sphereToPixScale 
+        const xPixOff = (x - xBase) * sphereToPixScale 
+        const yPixOff = (y - yBase) * sphereToPixScale 
         return [xPixOff, height - yPixOff]
     } else {
         return null;
@@ -460,13 +417,6 @@ class PinchZoom {
 
 
 
-
-
-
-const isIOS = () => /(iPad|iPhone)/g.test(navigator.userAgent)
-
-
-
 const objects = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
 const promises = []
 
@@ -490,7 +440,6 @@ for (let i = 0; i < objects.length; i++) {
 
 const userLoc = await getPosition()
 const userLatLong = { lat: userLoc.coords.latitude, long: userLoc.coords.longitude }
-
 
 
 function render(orientQuat) {
@@ -564,10 +513,7 @@ function iOSGetOrientationPerms() {
     } 
 }
 
-
-
-
-
+const isIOS = () => /(iPad|iPhone)/g.test(navigator.userAgent)
 if (isIOS()) {
     const allowButton = document.getElementById("request-perms")
     allowButton.style.display = 'block';

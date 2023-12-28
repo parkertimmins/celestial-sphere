@@ -258,8 +258,9 @@ function drawPlanet(st, p, x, y) {
 function computeBounds(longVisAngle) {
     const distToPlane = cos(longVisAngle / 2)
     const hSphere = 2 * sin(longVisAngle / 2)
+    const heightToWidthRatio = canvas.height / canvas.width
     const wSphere = hSphere / heightToWidthRatio
-    const sphereToPixScale = height / hSphere
+    const sphereToPixScale = canvas.height / hSphere
     const xBase = -wSphere/2, yBase = -hSphere/2
     // more min/max larger than screen so off screen rendered cleanly as enters frame
     const xMax = wSphere, xMin = -wSphere, yMax = hSphere, yMin = -hSphere
@@ -280,7 +281,7 @@ function toCanvasCoords(jd, ra, dec, inverseOrientQuat, bounds) {
     if (inFrame) {
         const xPixOff = (x - bounds.xBase) * bounds.sphereToPixScale 
         const yPixOff = (y - bounds.yBase) * bounds.sphereToPixScale 
-        return [xPixOff, height - yPixOff]
+        return [xPixOff, canvas.height - yPixOff]
     } else {
         return null;
     }
@@ -297,7 +298,7 @@ function addObject(st, inverseOrientQuat, jd, eclipLatLong, drawFunc) {
 function render(st) {
     const inverseOrientQuat = Quaternions.inverse(st.orientQuat)
     const jd = toJd(Date.now())
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height); // TODO canvas ctx
 
     for (const star of stars) {
         let { name, mag, ra, dec } = star
@@ -324,12 +325,8 @@ const minStarSize = (st) => toPixelSize(0.01, st)
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-canvas.width  = canvas.clientWidth;
-canvas.height = canvas.clientHeight;
-
-const width = canvas.width
-const height = canvas.height
-const heightToWidthRatio = height / width
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
 const brighestStarMag = -1.46           // sirius
 const minVisibleMag = 6               // dimmest magnitude shown
@@ -426,11 +423,11 @@ canvas.onpointermove = canvas.onpointermove = (ev) => {
     if (Object.keys(state.evCache).length == 2) {
         const [a1, b1] = Object.values(state.evCache)
         const prevPixDist = euclideanDist(a1.clientX, a1.clientY, b1.clientX, b1.clientY)
-        const prevDegDist = state.longVisAngle * (prevPixDist / height)
+        const prevDegDist = state.longVisAngle * (prevPixDist / canvas.height)
         state.evCache[ev.pointerId] = ev
         const [a2, b2] = Object.values(state.evCache)
         const currPixDist = euclideanDist(a2.clientX, a2.clientY, b2.clientX, b2.clientY)
-        const newLongVisAngle = Math.min(90, prevDegDist * (height / currPixDist)) 
+        const newLongVisAngle = Math.min(90, prevDegDist * (canvas.height / currPixDist)) 
         state.longVisAngle = newLongVisAngle // TODO global
         state.bounds = computeBounds(state.longVisAngle)
         render(state)
@@ -438,5 +435,4 @@ canvas.onpointermove = canvas.onpointermove = (ev) => {
         state.evCache[ev.pointerId] = ev
     }
 }
-
 

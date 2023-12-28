@@ -340,7 +340,7 @@ const promises = []
 promises.push(fetch('./data/stars.json').then(response => response.json()))
 promises.push(fetch('./data/planets.json').then(response => response.json()))
 const objects = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
-objects.forEach(obj => promises.push(loadImage(`./images/icons/${obj}.png`)))
+objects.forEach(obj => promises.push(loadImage(`./images/icons/${obj}.jpg`)))
 
 
 // Wait till files load 

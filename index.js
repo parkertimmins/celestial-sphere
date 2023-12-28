@@ -1,24 +1,14 @@
-
-// https://en.wikipedia.org/wiki/Julian_day
-// https://github.com/mourner/suncalc/blob/master/suncalc.js 
-const millisPerDay = 1000 * 60 * 60 * 24
-const daysPerCentury = 36525
-const j2000Date = Date.UTC(2000, 0, 1, 12, 0, 0)
-const j2000jd = 2451545
-const toJulianCenturies = (jd) =>  (jd - j2000jd) / daysPerCentury
-const toJd = (date) => (date - j2000Date) / millisPerDay + j2000jd
+//----------------------- General Math and utilities -----------------------
 const mod = (m, n) => ((m%n)+n)%n 
 const rad = (deg) => deg * Math.PI / 180
 const degree = (radian) => radian * (180 / Math.PI)
-const sin = (deg) => Math.sin(rad(deg)), 
-      cos = (deg) => Math.cos(rad(deg)), 
-      tan = (deg) => Math.tan(rad(deg)), 
-      acos = (x) => degree(Math.acos(x)), 
-      asin = (x) => degree(Math.asin(x)), 
-      atan = (x) => degree(Math.atan(x)), 
-      atan2 = (x, y) => degree(Math.atan2(x, y));
-
-// Simple vector functions
+const sin = (deg) => Math.sin(rad(deg))
+const cos = (deg) => Math.cos(rad(deg))
+const tan = (deg) => Math.tan(rad(deg))
+const acos = (x) => degree(Math.acos(x))
+const asin = (x) => degree(Math.asin(x))
+const atan = (x) => degree(Math.atan(x))
+const atan2 = (x, y) => degree(Math.atan2(x, y))
 const sum = (arr) => arr.reduce((a, b) => a+b, 0)
 const squaredNorm = (v) => sum(v.map(e => e*e))
 const norm = (v) => Math.sqrt(squaredNorm(v))
@@ -26,28 +16,6 @@ const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1
 const dot = (a, b) => sum(a.map((x, i) => x*b[i]))
 const scalarMult = (a, v) => v.map((x, i) => a * x)
 const euclideanDist = (x1, y1, x2, y2) => Math.sqrt((x2-x1)**2 + (y2-y1)**2)
-
-// Originally from most recent Astronomical Almanac, at least 1999-2015
-// An Alternative Lunar Ephemeris Model
-// https://caps.gsfc.nasa.gov/simpson/pubs/slunar.pdf
-// Ignore parallax
-function moonEclipLatLong(jd) {
-    const t = toJulianCenturies(jd)
-    const long = 218.32 + 481267.881 * t +
-         6.29 * sin( 477198.87 * t + 135.0) +
-        -1.27 * sin(-413335.36 * t + 259.3) +
-         0.66 * sin( 890534.22 * t + 235.7) +
-         0.21 * sin( 954397.74 * t + 269.9) +
-        -0.19 * sin(  35999.05 * t + 357.5) +
-        -0.11 * sin( 966404.03 * t + 186.6)
-    
-    const lat = 5.13 * sin( 483202.02 * t + 93.3) +
-        0.28 * sin( 960400.89 * t +  228.2) +
-       -0.28 * sin( 6003.15 * t +    318.3) +
-       -0.17 * sin( -407332.21 * t + 217.6)
-    
-    return { lat, long }
-}
 
 class Quaternions {
     static fromAngleAxis(angle, axis3Vec) {
@@ -104,80 +72,41 @@ class Quaternions {
     }
 }
 
-// https://www.movable-type.co.uk/scripts/gis-faq-5.1.html
-// returns angle of arc subtended by earth
-// returns non-negatives value
-function haversineDist(p1, p2) {
-    const dlon = p2.long - p1.long
-    const dlat = p2.lat - p1.lat
-    const a = sin(dlat/2)**2 + cos(p1.lat) * cos(p2.lat) * sin(dlon/2)**2;
-    return 2 * asin(Math.min(1, Math.sqrt(a)));
+
+//----------------------- Julian date -----------------------
+
+// https://www.aa.quae.nl/en/reken/zonpositie.html
+const millisPerDay = 1000 * 60 * 60 * 24
+const daysPerCentury = 36525
+const j2000Date = Date.UTC(2000, 0, 1, 12, 0, 0)
+const j2000jd = 2451545
+const toJulianCenturies = (jd) =>  (jd - j2000jd) / daysPerCentury
+const toJd = (date) => (date - j2000Date) / millisPerDay + j2000jd
+
+
+//----------------------- Compute ecliptic coordinates of objects that move against celestial sphere -----------------------
+
+// Originally from most recent Astronomical Almanac, at least 1999-2015
+// An Alternative Lunar Ephemeris Model
+// https://caps.gsfc.nasa.gov/simpson/pubs/slunar.pdf
+// Ignore parallax
+function moonEclipLatLong(jd) {
+    const t = toJulianCenturies(jd)
+    const long = 218.32 + 481267.881 * t +
+         6.29 * sin( 477198.87 * t + 135.0) +
+        -1.27 * sin(-413335.36 * t + 259.3) +
+         0.66 * sin( 890534.22 * t + 235.7) +
+         0.21 * sin( 954397.74 * t + 269.9) +
+        -0.19 * sin(  35999.05 * t + 357.5) +
+        -0.11 * sin( 966404.03 * t + 186.6)
+    
+    const lat = 5.13 * sin( 483202.02 * t + 93.3) +
+        0.28 * sin( 960400.89 * t +  228.2) +
+       -0.28 * sin( 6003.15 * t +    318.3) +
+       -0.17 * sin( -407332.21 * t + 217.6)
+    
+    return { lat, long }
 }
-
-// since we are looking for the place at solar noon,  
-// and hour angle H = 0 = side real time - right ascension, side real time == ra  
-const raToLong = (jd, ra) => (280.1470 + 360.9856235 * (jd - j2000jd) - ra) % 360
-
-// https://www.movable-type.co.uk/scripts/latlong.html - Bearing
-// http://mathforum.org/library/drmath/view/55417.html
-function bearing(p1, p2) {
-    const y = sin(p2.long - p1.long) * cos(p2.lat);
-    const x = cos(p1.lat) * sin(p2.lat) - sin(p1.lat) * cos(p2.lat) * cos(p2.long - p1.long);
-    const theta = atan2(y, x)
-
-    // since using long west, x is negative to normally long
-    // this means 0->180 will be from -y axis clockwise to +y axis, and 0 -> -180 will be mapped to -y axis to +y axis ccw
-    // hence to get to standard compass degrees, need to subtract 90, then do appropiate mod
-    return mod(-theta, 360);
-}
-
-// computer altitude/azimuth from ra/dec of a celestial object and its parallax angle and current time, and user location in lat long
-// celestial object is in equitorial celestial frame (not ecliptic)
-// assume parallax is 0
-function getAltAz(jd, userLoc, celestial) {
-    userLoc = toLatLongWest(userLoc) 
-    const latLongUnder = { lat: celestial.dec, long: raToLong(jd, celestial.ra) }
-    const angleDist = haversineDist(latLongUnder, userLoc)
-    const altitude = 90 - angleDist
-    const azimuth = bearing(userLoc, latLongUnder)
-    return { altitude, azimuth } 
-}
-
-const thetaToAz = (theta) => mod(-theta + 90, 360)
-
-// 0 -> 360 from top to 0->90, 0 to -90
-function azToTheta(azimuth) {
-    let theta = (azimuth - 90) % 360
-    return theta <= 180 ? -theta : 360 - theta
-}
-
-function toLatLongWest(latLong) {
-    const {lat, long} = latLong
-    const longWest = long < 0 ? -long : 360 - long
-    return {lat: lat, long: longWest } 
-}
-
-// to vectors on unit sphere
-function to3Vec(alt, az) {
-    const b = cos(alt)
-    const theta = azToTheta(az)
-    return [b*cos(theta), b*sin(theta), sin(alt)] 
-}
-
-function getPosition() {
-    return new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject))
-}
-const loadImage = (url) => new Promise((resolve, reject) => {
-  const img = new Image();
-  img.addEventListener('load', () => resolve(img));
-  img.src = url;
-});
-
-
-const EARTH_OBLIQUITY = 23.4393
-const rightAscension = (eclip) => atan2(sin(eclip.long) * cos(EARTH_OBLIQUITY) - tan(eclip.lat) * sin(EARTH_OBLIQUITY), cos(eclip.long))
-const declination = (eclip) => asin(sin(eclip.lat) * cos(EARTH_OBLIQUITY) + cos(eclip.lat) * sin(EARTH_OBLIQUITY) * sin(eclip.long))
-const eclipticToEquitorial = (eclip) => ({ ra: rightAscension(eclip), dec: declination(eclip) })
 
 //https://www.aa.quae.nl/en/reken/hemelpositie.html
 //https://www.aa.quae.nl/en/reken/zonpositie.html for kepler approximation
@@ -204,19 +133,76 @@ function sunEclipLatLong(jd, earth) {
 function planetEclipLatLong(jd, p, earth) {
     const [xp, yp, zp] = rectHelioEcliptical(jd, p) 
     const [xe, ye, ze] = rectHelioEcliptical(jd, earth) 
-    const x = xp - xe
-    const y = yp - ye
-    const z = zp - ze
+    const [x, y, z] = [xp - xe, yp - ye, zp - ze]
     const delta = Math.sqrt(x*x + y*y + z*z)
     const lambda = atan2(y, x)
     const beta = asin(z/delta)
     return { long: lambda, lat: beta } 
 }
 
-function toPixelSize(deg, st) {
-    return st.bounds.sphereToPixScale * rad(deg)
+//----------------------- Conversion from Ecliptic to Equitorial -----------------------
+
+// change to coordinates on a sphere shifted by angle along with 90 degree meridian
+function sphereCoordTransform({lat, long}, angle) {
+    const longAngle = atan2(sin(long) * cos(angle) - tan(lat) * sin(angle), cos(long))
+    const latAngle = asin(sin(lat) * cos(angle) + cos(lat) * sin(angle) * sin(long))
+    return {lat: latAngle, long: longAngle }
 }
 
+const EARTH_OBLIQUITY = 23.4393
+function eclipticToEquitorial(eclip) {
+    let {lat, long} = sphereCoordTransform(eclip, EARTH_OBLIQUITY)
+    return { ra: long, dec: lat }
+}
+
+//----------------------- Conversion from Equitorial to Altitude/Azimuth (horizontal coorinates) -----------------------
+const raToLong = (jd, ra) => (280.1470 + 360.9856235 * (jd - j2000jd) - ra) % 360
+const equitorialToLatLong = (jd, {ra, dec}) => ({ lat: dec, long: raToLong(jd, ra) })
+
+// computer altitude/azimuth from ra/dec of a celestial object at current time, and user location in lat long
+// celestial object is in equitorial frame
+// assume parallax is 0, eg at inifinite distance
+function getAltAz(user, celestial) {
+    const angle = 90 - user.lat
+    const point = { lat: celestial.lat, long: celestial.long - user.long + 90 }
+    const {lat, long} = sphereCoordTransform(point, angle)
+    return { altitude: lat, azimuth: mod(long + 90, 360) } 
+}
+
+// theta: west=0, positive to north, negative to south, azimuth: north=0, increase ccw, all positive
+const thetaToAz = (theta) => mod(-theta + 90, 360)
+
+// long: negative to west, positive to east, longWest: increase to west, all positive
+const toLatLongWest = ({lat, long}) => ({lat, long: mod(-long, 360) })
+
+// 0 -> 360 from top to 0->90, 0 to -90
+//const azToTheta = (azimuth) => (-azimuth+90) % 180
+function azToTheta(azimuth) {
+  let theta = (azimuth - 90) % 360
+  return theta <= 180 ? -theta : 360 - theta
+}
+
+// to vectors on unit sphere
+function to3Vec(alt, az) {
+    const b = cos(alt)
+    const theta = azToTheta(az)
+    return [b*cos(theta), b*sin(theta), sin(alt)] 
+}
+
+//----------------------- Rendering/UI code below -----------------------
+
+function getPosition() {
+    return new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject))
+}
+const loadImage = (url) => new Promise((resolve, reject) => {
+  const img = new Image();
+  img.addEventListener('load', () => resolve(img));
+  img.src = url;
+});
+
+
+
+const toPixelSize = (deg, st) => st.bounds.sphereToPixScale * rad(deg)
 const drawImgCentered = (ctx, img, x, y, size) => ctx.drawImage(img, x-size/2, y-size/2, size, size)
 
 function addTitle(st, ctx, x, y, text, color, font, pixSize) {
@@ -258,8 +244,7 @@ function drawPlanet(st, p, x, y) {
 function computeBounds(longVisAngle) {
     const distToPlane = cos(longVisAngle / 2)
     const hSphere = 2 * sin(longVisAngle / 2)
-    const heightToWidthRatio = canvas.height / canvas.width
-    const wSphere = hSphere / heightToWidthRatio
+    const wSphere = canvas.width * (hSphere / canvas.height)
     const sphereToPixScale = canvas.height / hSphere
     const xBase = -wSphere/2, yBase = -hSphere/2
     // more min/max larger than screen so off screen rendered cleanly as enters frame
@@ -268,7 +253,8 @@ function computeBounds(longVisAngle) {
 }
 
 function toCanvasCoords(jd, ra, dec, inverseOrientQuat, bounds) {
-    const { altitude, azimuth} = getAltAz(jd, userLatLong, { ra, dec })
+    const celestialLatLong = equitorialToLatLong(jd, {ra, dec})
+    const { altitude, azimuth} = getAltAz(userLatLong, celestialLatLong)
     const vecOnSphere = to3Vec(altitude, azimuth)
     const rotVecOnSphere = Quaternions.rotate(vecOnSphere, inverseOrientQuat).slice(1)
     if (rotVecOnSphere[2] > 0) {
@@ -277,14 +263,13 @@ function toCanvasCoords(jd, ra, dec, inverseOrientQuat, bounds) {
 
     //https://math.stackexchange.com/questions/3412199/how-to-calculate-the-intersection-point-of-a-vector-and-a-plane-defined-as-a-poi
     const [x, y, z] = scalarMult(-bounds.distToPlane / rotVecOnSphere[2], rotVecOnSphere)
-    const inFrame = bounds.xMin <= x && x <= bounds.xMax && bounds.yMin <= y && y <= bounds.yMax
-    if (inFrame) {
+    
+    if (bounds.xMin <= x && x <= bounds.xMax && bounds.yMin <= y && y <= bounds.yMax) {
         const xPixOff = (x - bounds.xBase) * bounds.sphereToPixScale 
         const yPixOff = (y - bounds.yBase) * bounds.sphereToPixScale 
         return [xPixOff, canvas.height - yPixOff]
-    } else {
-        return null;
-    }
+    } 
+    return null;
 }
 
 function addObject(st, inverseOrientQuat, jd, eclipLatLong, drawFunc) {
@@ -295,10 +280,10 @@ function addObject(st, inverseOrientQuat, jd, eclipLatLong, drawFunc) {
     }
 }
 
-function render(st) {
+function render(st, ctx, canvas) {
     const inverseOrientQuat = Quaternions.inverse(st.orientQuat)
     const jd = toJd(Date.now())
-    ctx.clearRect(0, 0, canvas.width, canvas.height); // TODO canvas ctx
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     for (const star of stars) {
         let { name, mag, ra, dec } = star
@@ -351,7 +336,7 @@ for (let i = 0; i < objects.length; i++) {
 }
 
 const userLoc = await getPosition()
-const userLatLong = { lat: userLoc.coords.latitude, long: userLoc.coords.longitude }
+const userLatLong = toLatLongWest({ lat: userLoc.coords.latitude, long: userLoc.coords.longitude })
 
 
 // Global mutable state
@@ -386,7 +371,7 @@ function iosRenderOnOrientChange() {
                     state.northOffsetQuat = Quaternions.fromAngleAxis(bearingDiff, [0, 0, -1]) 
                 }
                 state.orientQuat = Quaternions.multiply(state.northOffsetQuat, relativeQuat)
-                render(state)
+                render(state, ctx, canvas)
             });
           }
         })
@@ -401,7 +386,7 @@ function androidRenderOnOrientChange() {
     sensor.start();
     sensor.addEventListener("reading", () => {
         state.orientQuat = Quaternions.toInternalQuat(sensor.quaternion)
-        render(state)
+        render(state, ctx, canvas)
      });
     sensor.addEventListener("error", (error) => console.log(error));
 }
@@ -427,10 +412,9 @@ canvas.onpointermove = canvas.onpointermove = (ev) => {
         state.evCache[ev.pointerId] = ev
         const [a2, b2] = Object.values(state.evCache)
         const currPixDist = euclideanDist(a2.clientX, a2.clientY, b2.clientX, b2.clientY)
-        const newLongVisAngle = Math.min(90, prevDegDist * (canvas.height / currPixDist)) 
-        state.longVisAngle = newLongVisAngle // TODO global
+        state.longVisAngle = Math.min(90, prevDegDist * (canvas.height / currPixDist)) 
         state.bounds = computeBounds(state.longVisAngle)
-        render(state)
+        render(state, ctx, canvas)
     } else {
         state.evCache[ev.pointerId] = ev
     }

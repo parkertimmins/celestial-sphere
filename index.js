@@ -365,6 +365,7 @@ function iosRenderOnOrientChange() {
                 state.bearingDiffFilter.update(bearingDiff)
                 const northOffsetQuat = Quaternions.fromAngleAxis(state.bearingDiffFilter.value, [0, 0, -1])
                 state.orientQuat = Quaternions.multiply(northOffsetQuat, relativeQuat)
+                console.log('bearing', bearingDiff, bearingDiffFilter.value)
                 render(state, ctx, canvas)
             });
           }

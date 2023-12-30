@@ -7,20 +7,15 @@ const cos = (deg) => Math.cos(rad(deg))
 const tan = (deg) => Math.tan(rad(deg))
 const acos = (x) => degree(Math.acos(x))
 const asin = (x) => degree(Math.asin(x))
-const atan = (x) => degree(Math.atan(x))
 const atan2 = (x, y) => degree(Math.atan2(x, y))
 const sum = (arr) => arr.reduce((a, b) => a+b, 0)
 const squaredNorm = (v) => sum(v.map(e => e*e))
-const norm = (v) => Math.sqrt(squaredNorm(v))
-const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]
-const dot = (a, b) => sum(a.map((x, i) => x*b[i]))
-const scalarMult = (a, v) => v.map((x, i) => a * x)
+const scalarMult = (a, v) => v.map(x => a*x)
 const euclideanDist = (x1, y1, x2, y2) => Math.sqrt((x2-x1)**2 + (y2-y1)**2)
 
 class Quaternions {
-    static fromAngleAxis(angle, axis3Vec) {
-        const sinAngle2 = sin(angle/2)
-        return [cos(angle/2)].concat(axis3Vec.map(a => a*sinAngle2))
+    static fromAngleAxis(angle, axis) {
+        return [cos(angle/2)].concat(scalarMult(sin(angle/2), axis))
     }
 
     // internal [s, v] - external [v, s]
@@ -45,8 +40,7 @@ class Quaternions {
     }
 
     static inverse(q) {
-        const sn =  squaredNorm(q)
-        return [q[0], -q[1], -q[2], -q[3]].map(a => a / sn)
+        return scalarMult(1/squaredNorm(q), [q[0], -q[1], -q[2], -q[3]])
     }
     
     // https://w3c.github.io/deviceorientation/#deviceorientation (Example 11)
@@ -72,9 +66,7 @@ class Quaternions {
     }
 }
 
-
 //----------------------- Julian date -----------------------
-
 // https://www.aa.quae.nl/en/reken/zonpositie.html
 const millisPerDay = 1000 * 60 * 60 * 24
 const daysPerCentury = 36525
@@ -85,7 +77,6 @@ const toJd = (date) => (date - j2000Date) / millisPerDay + j2000jd
 
 
 //----------------------- Compute ecliptic coordinates of objects that move against celestial sphere -----------------------
-
 // Originally from most recent Astronomical Almanac, at least 1999-2015
 // An Alternative Lunar Ephemeris Model
 // https://caps.gsfc.nasa.gov/simpson/pubs/slunar.pdf
@@ -151,7 +142,7 @@ function sphereCoordTransform({lat, long}, angle) {
 
 const EARTH_OBLIQUITY = 23.4393
 function eclipticToEquitorial(eclip) {
-    let {lat, long} = sphereCoordTransform(eclip, EARTH_OBLIQUITY)
+    const {lat, long} = sphereCoordTransform(eclip, EARTH_OBLIQUITY)
     return { ra: long, dec: lat }
 }
 
@@ -172,15 +163,14 @@ function getAltAz(user, celestial) {
 // theta: west=0, positive to north, negative to south, azimuth: north=0, increase ccw, all positive
 const thetaToAz = (theta) => mod(-theta + 90, 360)
 
-// long: negative to west, positive to east, longWest: increase to west, all positive
-const toLatLongWest = ({lat, long}) => ({lat, long: mod(-long, 360) })
-
-// 0 -> 360 from top to 0->90, 0 to -90
-//const azToTheta = (azimuth) => (-azimuth+90) % 180
 function azToTheta(azimuth) {
-  let theta = (azimuth - 90) % 360
+  const theta = (azimuth - 90) % 360
   return theta <= 180 ? -theta : 360 - theta
 }
+
+// long: negative to west, positive to east, longWest: increase to west, all positive
+const toLongWest = long => mod(-long, 360)
+
 
 // to vectors on unit sphere
 function to3Vec(alt, az) {
@@ -199,7 +189,6 @@ const loadImage = (url) => new Promise((resolve, reject) => {
   img.addEventListener('load', () => resolve(img));
   img.src = url;
 });
-
 
 
 const toPixelSize = (deg, st) => st.bounds.sphereToPixScale * rad(deg)
@@ -254,7 +243,7 @@ function computeBounds(longVisAngle) {
 
 function toCanvasCoords(jd, ra, dec, inverseOrientQuat, bounds) {
     const celestialLatLong = equitorialToLatLong(jd, {ra, dec})
-    const { altitude, azimuth} = getAltAz(userLatLong, celestialLatLong)
+    const { altitude, azimuth } = getAltAz(userLatLong, celestialLatLong)
     const vecOnSphere = to3Vec(altitude, azimuth)
     const rotVecOnSphere = Quaternions.rotate(vecOnSphere, inverseOrientQuat).slice(1)
     if (rotVecOnSphere[2] > 0) {
@@ -263,7 +252,6 @@ function toCanvasCoords(jd, ra, dec, inverseOrientQuat, bounds) {
 
     //https://math.stackexchange.com/questions/3412199/how-to-calculate-the-intersection-point-of-a-vector-and-a-plane-defined-as-a-poi
     const [x, y, z] = scalarMult(-bounds.distToPlane / rotVecOnSphere[2], rotVecOnSphere)
-    
     if (bounds.xMin <= x && x <= bounds.xMax && bounds.yMin <= y && y <= bounds.yMax) {
         const xPixOff = (x - bounds.xBase) * bounds.sphereToPixScale 
         const yPixOff = (y - bounds.yBase) * bounds.sphereToPixScale 
@@ -319,7 +307,7 @@ const magRange = -brighestStarMag + minVisibleMag
 
 // Start loading files for stars, planet data, and images
 const promises = []
-promises.push(fetch('./data/stars.json').then(response => response.json()))
+promises.push(fetch('./data/stars/yale_stars.json').then(response => response.json()))
 promises.push(fetch('./data/planets.json').then(response => response.json()))
 const objects = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
 objects.forEach(obj => promises.push(loadImage(`./images/icons/${obj}.png`)))
@@ -327,17 +315,13 @@ objects.forEach(obj => promises.push(loadImage(`./images/icons/${obj}.png`)))
 
 // Wait till files load 
 const resolved = await Promise.all(promises)
-const stars = resolved[0]
+const stars = resolved[0].map(s => ({ra:s[0], dec:s[1], mag:s[2], name:(s.length===4 ? s[3] : '')}))
 const planets = resolved[1]
 const earth = planets.filter((p) => p.name === "Earth")[0]
-const images = {}
-for (let i = 0; i < objects.length; i++) {
-    images[objects[i]] = resolved[i+2]
-}
+const images = Object.fromEntries(objects.map((name, i) => [name, resolved[i+2]]))
 
 const userLoc = await getPosition()
-const userLatLong = toLatLongWest({ lat: userLoc.coords.latitude, long: userLoc.coords.longitude })
-
+const userLatLong = { lat: userLoc.coords.latitude, long: toLongWest(userLoc.coords.longitude) }
 
 // Global mutable state
 const state = {} 
@@ -378,7 +362,6 @@ function iosRenderOnOrientChange() {
         .catch(console.error);
     } 
 }
-
 
 function androidRenderOnOrientChange() {
     const options = { frequency: 30, referenceFrame: "device" };

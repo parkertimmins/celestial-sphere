@@ -131,3 +131,16 @@ https://gery.casiez.net/1euro/
 
 Plane line intersection
 https://math.stackexchange.com/questions/3412199/how-to-calculate-the-intersection-point-of-a-vector-and-a-plane-defined-as-a-poi
+
+
+
+Todo:
+    - on iphone resample difference between relative and absolute heading 
+    - [x] fix http issues issues
+    - add parallax?
+    - fix jitter with 1 euro filter
+    - messier? 
+    - [x] weird rendering on load, mainly in iphone, maybe need to render on resize
+    - [x] labels shouldn't wink out when stars go off screen
+    - [x] When zoomed in distance to label increases
+        - actually star map works this way to keep as is

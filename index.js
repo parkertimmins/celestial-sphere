@@ -337,13 +337,8 @@ const userLatLong = { lat: userLoc.coords.latitude, long: toLongWest(userLoc.coo
 const state = {} 
 // degrees of sky covered by long edge of screen 
 state.longVisAngle = 90
-
-
-state.bearing = 0
-
 // quaternion describing current phone orientation
 state.orientQuat = [0, 0, 0, 0]
-state.orientQuatFilter = new OneEuroFilterArray(Date.now(), [0, 0, 0, 0], 0.004, 0.7) 
 // iPhone saves difference between relative north and absolute north, filtered to avoid jumps
 state.bearingDiffFilter = expAvgFilter(0.01)
 // data derived from longVisAngle, held in state for efficiency
@@ -378,47 +373,14 @@ function iosRenderOnOrientChange() {
     } 
 }
 
-
 function androidRenderOnOrientChange() {
-    let measuredBearing = 0
-    const bearingDiffFilter = expAvgFilter(0.01, 0)
-
-    function getActualHeading(quat) {
-        const phoneNorth = [0, 1, 0]
-        const northOrient = Quaternions.rotate(phoneNorth, quat).slice(1)
-        const thetaRelativeNorth = atan2(northOrient[1], northOrient[0])
-        const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
-        return bearingRelativeNorth 
-    }
-
-    window.addEventListener('deviceorientation', () => {
-        const relativeQuat = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
-        const phoneNorth = [0, 1, 0]
-        const northRotated = Quaternions.rotate(phoneNorth, relativeQuat).slice(1)
-        const thetaRelativeNorth = atan2(northRotated[1], northRotated[0])
-        const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
-        const bearingDiff = mod(measuredBearing - bearingRelativeNorth, 360)
-
-        bearingDiffFilter.update(bearingDiff)
-        if (Math.abs(bearingDiff - bearingDiffFilter.value) > 10) {
-            console.log(bearingDiff, bearingDiffFilter.value)
-        }
-
-        const northOffsetQuat = Quaternions.fromAngleAxis(bearingDiffFilter.value, [0, 0, -1])
-        //console.log(northOffsetQuat, Quaternions.fromAngleAxis(bearingDiff, [0, 0, -1]))
-
-        state.orientQuat = Quaternions.multiply(northOffsetQuat, relativeQuat)
-
-        render(state, ctx, canvas)
-   });
-
     const options = { frequency: 30, referenceFrame: "device" };
     const sensor = new AbsoluteOrientationSensor(options);
     sensor.start();
     sensor.addEventListener("reading", () => {
-        const dirQuat = Quaternions.toInternalQuat(sensor.quaternion)
-        measuredBearing = getActualHeading(dirQuat)
-     });
+        state.orientQuat = Quaternions.toInternalQuat(sensor.quaternion)
+        render(state, ctx, canvas)
+    });
     sensor.addEventListener("error", (error) => console.log(error));
 }
 

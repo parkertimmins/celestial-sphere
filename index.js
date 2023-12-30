@@ -66,6 +66,64 @@ class Quaternions {
     }
 }
 
+
+class OneEuroFilter {
+    constructor(t0, x0, dx0 = 0.0, min_cutoff = 1.0, beta = 0.0, d_cutoff = 1.0) {
+        // The parameters.
+        this.min_cutoff = min_cutoff;
+        this.beta = beta;
+        this.d_cutoff = d_cutoff;
+        // Previous values.
+        this.x_prev = x0;
+        this.dx_prev = dx0;
+        this.t_prev = t0;
+    }
+
+    filter(t, x) {
+        const t_e = t - this.t_prev;
+
+        // The filtered derivative of the signal.
+        const a_d = OneEuroFilter.smoothingFactor(t_e, this.d_cutoff);
+        const dx = (x - this.x_prev) / t_e;
+        const dx_hat = OneEuroFilter.exponentialSmoothing(a_d, dx, this.dx_prev);
+
+        // The filtered signal.
+        const cutoff = this.min_cutoff + this.beta * Math.abs(dx_hat);
+        const a = OneEuroFilter.smoothingFactor(t_e, cutoff);
+        const x_hat = OneEuroFilter.exponentialSmoothing(a, x, this.x_prev);
+
+        // Memorize the previous values.
+        this.x_prev = x_hat;
+        this.dx_prev = dx_hat;
+        this.t_prev = t;
+
+        return x_hat;
+    }
+
+    static smoothingFactor(t_e, cutoff) {
+        const r = 2 * Math.PI * cutoff * t_e;
+        return r / (r + 1);
+    }
+
+    static exponentialSmoothing(a, x, x_prev) {
+        // exp avg, alpha near 1, means weight towards most recent sample
+        return a * x + (1 - a) * x_prev;
+    }
+}
+
+
+class OneEuroFilterArray {
+    constructor(t0, x0s, dx0 = 0.0, min_cutoff = 1.0, beta = 0.0, d_cutoff = 1.0) {
+        this.filters = x0s.map(x0 => new OneEuroFilter(t0, x0, dx0, min_cutoff, beta, d_cutoff))
+    }
+
+    filter(t, xs) {
+        return xs.map((x, i) => this.filters[i].filter(t, x))
+    }
+}
+
+
+
 //----------------------- Julian date -----------------------
 // https://www.aa.quae.nl/en/reken/zonpositie.html
 const millisPerDay = 1000 * 60 * 60 * 24
@@ -327,8 +385,13 @@ const userLatLong = { lat: userLoc.coords.latitude, long: toLongWest(userLoc.coo
 const state = {} 
 // degrees of sky covered by long edge of screen 
 state.longVisAngle = 90
+
+
+state.bearing = 0
+
 // quaternion describing current phone orientation
 state.orientQuat = [0, 0, 0, 0]
+state.orientQuatFilter = new OneEuroFilterArray(Date.now(), [0, 0, 0, 0], 0.004, 0.7) 
 // iPhone saves offset quaternion between relative north and absolute north
 state.northOffsetQuat = null
 // data derived from longVisAngle, held in state for efficiency
@@ -354,7 +417,7 @@ function iosRenderOnOrientChange() {
                     const bearingDiff = event.webkitCompassHeading - bearingRelativeNorth 
                     state.northOffsetQuat = Quaternions.fromAngleAxis(bearingDiff, [0, 0, -1]) 
                 }
-                state.orientQuat = Quaternions.multiply(state.northOffsetQuat, relativeQuat)
+                state.orientQuat = state.orientQuatFilter.filter(Date.now(), Quaternions.multiply(state.northOffsetQuat, relativeQuat))
                 render(state, ctx, canvas)
             });
           }
@@ -363,13 +426,44 @@ function iosRenderOnOrientChange() {
     } 
 }
 
+
 function androidRenderOnOrientChange() {
+    let measuredBearing = 0
+    const bearingDiffFilter = new OneEuroFilter(Date.now(), 0, 0.004, 0.7) 
+
+    function getActualHeading(quat) {
+        const phoneNorth = [0, 1, 0]
+        const northOrient = Quaternions.rotate(phoneNorth, quat).slice(1)
+        const thetaRelativeNorth = atan2(northOrient[1], northOrient[0])
+        const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
+        return bearingRelativeNorth 
+    }
+
+    window.addEventListener('deviceorientation', () => {
+        const relativeQuat = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
+        const phoneNorth = [0, 1, 0]
+        const northRotated = Quaternions.rotate(phoneNorth, relativeQuat).slice(1)
+        const thetaRelativeNorth = atan2(northRotated[1], northRotated[0])
+        const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
+        const bearingDiff = mod(measuredBearing - bearingRelativeNorth, 360)
+
+        const filteredBearingDiff = bearingDiffFilter.filter(Date.now(), bearingDiff)
+        console.log(bearingDiff, filteredBearingDiff)
+
+        const northOffsetQuat = Quaternions.fromAngleAxis(filteredBearingDiff, [0, 0, -1])
+        //console.log(northOffsetQuat, Quaternions.fromAngleAxis(bearingDiff, [0, 0, -1]))
+
+        state.orientQuat = Quaternions.multiply(northOffsetQuat, relativeQuat)
+
+        render(state, ctx, canvas)
+   });
+
     const options = { frequency: 30, referenceFrame: "device" };
     const sensor = new AbsoluteOrientationSensor(options);
     sensor.start();
     sensor.addEventListener("reading", () => {
-        state.orientQuat = Quaternions.toInternalQuat(sensor.quaternion)
-        render(state, ctx, canvas)
+        const dirQuat = Quaternions.toInternalQuat(sensor.quaternion)
+        measuredBearing = getActualHeading(dirQuat)
      });
     sensor.addEventListener("error", (error) => console.log(error));
 }

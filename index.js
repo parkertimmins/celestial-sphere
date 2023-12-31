@@ -367,7 +367,7 @@ function iosRenderOnOrientChange() {
                 const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
                 const bearingDiff = mod(event.webkitCompassHeading - bearingRelativeNorth, 360)
                 state.bearingDiffFilter.update(bearingDiff, percHorizontalComponents)
-                console.log(event.webkitCompassHeading, bearingDiff, bearingRelativeNorth, percHorizontalComponentst)
+                console.log(event.webkitCompassHeading, bearingDiff, bearingRelativeNorth, percHorizontalComponents)
                 const northOffsetQuat = Quaternions.fromAngleAxis(state.bearingDiffFilter.value, [0, 0, -1])
                 state.orientQuat = Quaternions.multiply(northOffsetQuat, relativeQuat)
                 render(state, ctx, canvas)

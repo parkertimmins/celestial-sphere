@@ -70,7 +70,10 @@ class Quaternions {
 const expAvgFilter = (a = 0.5) => {
     return {
         x: null,
-        update(xt) { this.x = (this.x === null ? xt : (a * xt + (1 - a) * this.x)) },
+        update(xt, weight) { 
+            const b = a * weight; // weight is specific to this sample
+            this.x = (this.x === null ? xt : (b * xt + (1 - b) * this.x)) 
+        },
         get value () { return this.x }
     }
 }
@@ -340,7 +343,7 @@ state.longVisAngle = 90
 // quaternion describing current phone orientation
 state.orientQuat = [0, 0, 0, 0]
 // iPhone saves difference between relative north and absolute north, filtered to avoid jumps
-state.bearingDiffFilter = expAvgFilter(0.001)
+state.bearingDiffFilter = expAvgFilter(0.1)
 // data derived from longVisAngle, held in state for efficiency
 state.bounds = computeBounds(state.longVisAngle)
 // cache of pointer events for zooming 
@@ -359,11 +362,12 @@ function iosRenderOnOrientChange() {
                 const relativeQuat = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
                 const phoneNorth = [0, 1, -1] // north on the iphone is 45 degrees down apparently
                 const northRotated = Quaternions.rotate(phoneNorth, relativeQuat).slice(1)
+                const percHorizontalComponents = 1 - northRotated[2] / sum(northRotated)
                 const thetaRelativeNorth = atan2(northRotated[1], northRotated[0])
                 const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
                 const bearingDiff = mod(event.webkitCompassHeading - bearingRelativeNorth, 360)
-                state.bearingDiffFilter.update(bearingDiff)
-                console.log(event.webkitCompassHeading, event.webkitCompassAccuracy, bearingDiff, bearingRelativeNorth)
+                state.bearingDiffFilter.update(bearingDiff, percHorizontalComponents)
+                //console.log(event.webkitCompassHeading, event.webkitCompassAccuracy, bearingDiff, bearingRelativeNorth)
                 const northOffsetQuat = Quaternions.fromAngleAxis(state.bearingDiffFilter.value, [0, 0, -1])
                 state.orientQuat = Quaternions.multiply(northOffsetQuat, relativeQuat)
                 //console.log(event.webkitCompassHeading, bearingRelativeNorth, bearingDiff, state.bearingDiffFilter.value)

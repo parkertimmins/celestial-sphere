@@ -340,7 +340,7 @@ state.longVisAngle = 90
 // quaternion describing current phone orientation
 state.orientQuat = [0, 0, 0, 0]
 // iPhone saves difference between relative north and absolute north, filtered to avoid jumps
-state.bearingDiffFilter = expAvgFilter(0.01)
+state.bearingDiffFilter = expAvgFilter(0.001)
 // data derived from longVisAngle, held in state for efficiency
 state.bounds = computeBounds(state.longVisAngle)
 // cache of pointer events for zooming 

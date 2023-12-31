@@ -352,7 +352,7 @@ function iosRenderOnOrientChange() {
 
     document.getElementById("request-perms").style.display = 'none';
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission()
+      DeviceOrientationEvent.requestPermission(true)
         .then(permissionState => {
           if (permissionState === 'granted') {
             window.addEventListener('deviceorientation', () => {
@@ -367,7 +367,7 @@ function iosRenderOnOrientChange() {
                 state.orientQuat = Quaternions.multiply(northOffsetQuat, relativeQuat)
                 console.log(event.webkitCompassHeading, bearingRelativeNorth, bearingDiff, state.bearingDiffFilter.value)
                 render(state, ctx, canvas)
-            });
+            }, true);
           }
         })
         .catch(console.error);

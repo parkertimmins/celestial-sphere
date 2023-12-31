@@ -358,6 +358,37 @@ function iosRenderOnOrientChange() {
       DeviceOrientationEvent.requestPermission(true)
         .then(permissionState => {
           if (permissionState === 'granted') {
+
+
+             window.addEventListener('deviceorientation', () => {
+                const relativeQuat = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
+
+                const phoneBack = [0, 0, -1] 
+                const backRot = Quaternions.rotate(phoneBack, relativeQuat).slice(1)
+                
+                const b = Math.sqrt(backRot[0]**2 + backRot[1]**2)
+                const inCone = backRot[2] > b
+
+                const phoneNorth = [0, 1, 0] 
+                const northRot = Quaternions.rotate(phoneNorth, relativeQuat).slice(1)
+                const upsideDown = northRot[2] < 0
+
+                const flipCompass = (inCone && !upsideDown) || (!inCone && upsideDown)
+                const bearing = flipCompass ? mod(event.webkitCompassHeading + 180, 360) : event.webkitCompassHeading
+
+                //const percHorizontalComponents = 1 - Math.abs(northRotated[2]) / sum(northRotated.map(Math.abs))
+                const thetaRelativeNorth = atan2(northRotated[1], northRotated[0])
+                const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
+                const bearingDiff = mod(bearing - bearingRelativeNorth, 360)
+                //state.bearingDiffFilter.update(bearingDiff, percHorizontalComponents)
+                //console.log(event.webkitCompassHeading, bearingDiff, bearingRelativeNorth, percHorizontalComponents, state.bearingDiffFilter.value)
+                const northOffsetQuat = Quaternions.fromAngleAxis(bearingDiff, [0, 0, -1])
+                //const northOffsetQuat = Quaternions.fromAngleAxis(state.bearingDiffFilter.value, [0, 0, -1])
+                state.orientQuat = Quaternions.multiply(northOffsetQuat, relativeQuat)
+                render(state, ctx, canvas)
+            }, true);
+
+/*
             window.addEventListener('deviceorientation', () => {
                 const relativeQuat = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
                 const phoneNorth = [0, 1, -1] // north on the iphone is 45 degrees down apparently
@@ -372,6 +403,7 @@ function iosRenderOnOrientChange() {
                 state.orientQuat = Quaternions.multiply(northOffsetQuat, relativeQuat)
                 render(state, ctx, canvas)
             }, true);
+            */
           }
         })
         .catch(console.error);

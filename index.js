@@ -371,7 +371,7 @@ function iosRenderOnOrientChange() {
                 const backRotated = Quaternions.rotate(phoneBack, relativeQuat).slice(1)
 
                 const lenProjOnXy = Math.sqrt(northRotated[0]**2 + northRotated[1]**2)
-                const northRotatedAngleFromHorizon = atan(Math.abs(northRotated[2]) / lenProjOnXy) 
+                const northRotatedAngleFromHorizon = Math.abs(atan2(northRotated[2], lenProjOnXy))
 
                 console.log('angle', northRotatedAngleFromHorizon) 
                 if (backRotated[2] < 0) {

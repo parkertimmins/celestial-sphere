@@ -370,6 +370,10 @@ function iosRenderOnOrientChange() {
                 const northRotated = Quaternions.rotate(phoneNorth, relativeQuat).slice(1)
                 const backRotated = Quaternions.rotate(phoneBack, relativeQuat).slice(1)
 
+                const lenProjOnXy = Math.sqrt(northRotated[0]**2 + northRotated[1]**2)
+                const northRotatedAngleFromHorizon = atan(Math.abs(northRotated[2]) / lenProjOnXy) 
+
+                console.log('angle', northRotatedAngleFromHorizon) 
                 if (backRotated[2] < 0) {
                     const thetaRelativeNorth = atan2(northRotated[1], northRotated[0])
                     const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)

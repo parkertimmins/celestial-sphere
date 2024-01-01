@@ -70,9 +70,8 @@ class Quaternions {
 const expAvgFilter = (a = 0.5) => {
     return {
         x: null,
-        update(xt, weight) { 
-            const b = a * weight; // weight is specific to this sample
-            this.x = (this.x === null ? xt : (b * xt + (1 - b) * this.x)) 
+        update(xt) { 
+            this.x = (this.x === null ? xt : (a * xt + (1 - a) * this.x)) 
         },
         get value () { return this.x }
     }
@@ -343,7 +342,7 @@ state.longVisAngle = 90
 // quaternion describing current phone orientation
 state.orientQuat = [0, 0, 0, 0]
 // iPhone saves difference between relative north and absolute north, filtered to avoid jumps
-state.bearingDiffFilter = expAvgFilter(0.1)
+state.bearingDiffFilter = expAvgFilter(0.05)
 // data derived from longVisAngle, held in state for efficiency
 state.bounds = computeBounds(state.longVisAngle)
 // cache of pointer events for zooming 
@@ -359,51 +358,25 @@ function iosRenderOnOrientChange() {
         .then(permissionState => {
           if (permissionState === 'granted') {
 
-
-             window.addEventListener('deviceorientation', () => {
-                const relativeQuat = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
-
-                const phoneBack = [0, 0, -1] 
-                const backRot = Quaternions.rotate(phoneBack, relativeQuat).slice(1)
-                
-                const b = Math.sqrt(backRot[0]**2 + backRot[1]**2)
-                const inCone = backRot[2] > b
-
-                const phoneNorth = [0, 1, 0] 
-                const northRot = Quaternions.rotate(phoneNorth, relativeQuat).slice(1)
-                const upsideDown = northRot[2] < 0
-
-                const flipCompass = (inCone && !upsideDown) || (!inCone && upsideDown)
-                const bearing = flipCompass ? mod(event.webkitCompassHeading + 180, 360) : event.webkitCompassHeading
-
-                //const percHorizontalComponents = 1 - Math.abs(northRotated[2]) / sum(northRotated.map(Math.abs))
-                const thetaRelativeNorth = atan2(northRot[1], northRot[0])
-                const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
-                const bearingDiff = mod(bearing - bearingRelativeNorth, 360)
-                //state.bearingDiffFilter.update(bearingDiff, percHorizontalComponents)
-                //console.log(event.webkitCompassHeading, bearingDiff, bearingRelativeNorth, percHorizontalComponents, state.bearingDiffFilter.value)
-                const northOffsetQuat = Quaternions.fromAngleAxis(bearingDiff, [0, 0, -1])
-                //const northOffsetQuat = Quaternions.fromAngleAxis(state.bearingDiffFilter.value, [0, 0, -1])
-                state.orientQuat = Quaternions.multiply(northOffsetQuat, relativeQuat)
-                render(state, ctx, canvas)
-            }, true);
-
-/*
             window.addEventListener('deviceorientation', () => {
                 const relativeQuat = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
-                const phoneNorth = [0, 1, -1] // north on the iphone is 45 degrees down apparently
+                const phoneNorth = [0, 1, 0] 
+                const phoneBack = [0, 0, -1] 
                 const northRotated = Quaternions.rotate(phoneNorth, relativeQuat).slice(1)
-                const percHorizontalComponents = 1 - Math.abs(northRotated[2]) / sum(northRotated.map(Math.abs))
-                const thetaRelativeNorth = atan2(northRotated[1], northRotated[0])
-                const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
-                const bearingDiff = mod(event.webkitCompassHeading - bearingRelativeNorth, 360)
-                state.bearingDiffFilter.update(bearingDiff, percHorizontalComponents)
-                console.log(event.webkitCompassHeading, bearingDiff, bearingRelativeNorth, percHorizontalComponents, state.bearingDiffFilter.value)
+                const backRotated = Quaternions.rotate(phoneBack, relativeQuat).slice(1)
+
+                if (bearingDiffFilter.value === null || (northRotated[2] > 0 && backRotated[2] < 0)) {
+                    const thetaRelativeNorth = atan2(northRotated[1], northRotated[0])
+                    const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
+                    const bearingDiff = mod(event.webkitCompassHeading - bearingRelativeNorth, 360)
+                    state.bearingDiffFilter.update(bearingDiff)
+                }
+
                 const northOffsetQuat = Quaternions.fromAngleAxis(state.bearingDiffFilter.value, [0, 0, -1])
                 state.orientQuat = Quaternions.multiply(northOffsetQuat, relativeQuat)
+                
                 render(state, ctx, canvas)
             }, true);
-            */
           }
         })
         .catch(console.error);

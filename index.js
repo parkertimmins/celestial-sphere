@@ -375,7 +375,9 @@ function iosRenderOnOrientChange() {
                     const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
                     const bearingDiff = mod(event.webkitCompassHeading - bearingRelativeNorth, 360)
                     state.bearingDiffFilter.update(bearingDiff)
-                //    console.log(event.webkitCompassHeading, bearingRelativeNorth, bearingDiff, state.bearingDiffFilter.value)
+                    console.log(event.webkitCompassHeading, bearingRelativeNorth, bearingDiff, state.bearingDiffFilter.value)
+                } else {
+                    console.log('no compass')
                 }
 
 

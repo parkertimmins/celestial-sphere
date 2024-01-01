@@ -359,6 +359,11 @@ function iosRenderOnOrientChange() {
           if (permissionState === 'granted') {
 
             window.addEventListener('deviceorientation', () => {
+                if (event.webkitCompassHeading === 0 && state.bearingDiffFilter.value === null) {
+                    console.log('skipping initial orientation');
+                    return;
+                }
+
                 const relativeQuat = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
                 const phoneNorth = [0, 1, 0] 
                 const phoneBack = [0, 0, -1] 
@@ -370,9 +375,7 @@ function iosRenderOnOrientChange() {
                     const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
                     const bearingDiff = mod(event.webkitCompassHeading - bearingRelativeNorth, 360)
                     state.bearingDiffFilter.update(bearingDiff)
-                    console.log(event.webkitCompassHeading, bearingRelativeNorth, bearingDiff, state.bearingDiffFilter.value)
-                } else {
-                    console.log('greater', backRotated[2])
+                //    console.log(event.webkitCompassHeading, bearingRelativeNorth, bearingDiff, state.bearingDiffFilter.value)
                 }
 
 

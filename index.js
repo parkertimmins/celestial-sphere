@@ -365,12 +365,16 @@ function iosRenderOnOrientChange() {
                 const northRotated = Quaternions.rotate(phoneNorth, relativeQuat).slice(1)
                 const backRotated = Quaternions.rotate(phoneBack, relativeQuat).slice(1)
 
-                if (state.bearingDiffFilter.value === null || (northRotated[2] > 0 && backRotated[2] < 0)) {
+                if (backRotated[2] < 0) {
                     const thetaRelativeNorth = atan2(northRotated[1], northRotated[0])
                     const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
                     const bearingDiff = mod(event.webkitCompassHeading - bearingRelativeNorth, 360)
                     state.bearingDiffFilter.update(bearingDiff)
+                    console.log(event.webkitCompassHeading, bearingRelativeNorth, bearingDiff, state.bearingDiffFilter.value)
+                } else {
+                    console.log('greater', backRotated[2])
                 }
+
 
                 const northOffsetQuat = Quaternions.fromAngleAxis(state.bearingDiffFilter.value, [0, 0, -1])
                 state.orientQuat = Quaternions.multiply(northOffsetQuat, relativeQuat)

@@ -373,16 +373,17 @@ function iosRenderOnOrientChange() {
                 const lenProjOnXy = Math.sqrt(northRotated[0]**2 + northRotated[1]**2)
                 const northRotatedAngleFromHorizon = Math.abs(atan2(northRotated[2], lenProjOnXy))
 
-                console.log('angle', northRotatedAngleFromHorizon) 
-                if (backRotated[2] < 0) {
-                    const thetaRelativeNorth = atan2(northRotated[1], northRotated[0])
-                    const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
-                    const bearingDiff = mod(event.webkitCompassHeading - bearingRelativeNorth, 360)
-                    state.bearingDiffFilter.update(bearingDiff)
-                    console.log(event.webkitCompassHeading, bearingRelativeNorth, bearingDiff, state.bearingDiffFilter.value)
-                } else {
-                    console.log('no compass')
-                }
+                do {
+                    if (backRotated[2] < 0 && northRotatedAngleFromHorizon < 80) {
+                        const thetaRelativeNorth = atan2(northRotated[1], northRotated[0])
+                        const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
+                        const bearingDiff = mod(event.webkitCompassHeading - bearingRelativeNorth, 360)
+                        state.bearingDiffFilter.update(bearingDiff)
+                    }
+                    if (state.bearingDiffFilter.value === null) {
+                        alert("Compass reading needed. Hold the phone horizontal to the ground, the click ok")
+                    }
+                } while (state.bearingDiffFilter.value === null);
 
 
                 const northOffsetQuat = Quaternions.fromAngleAxis(state.bearingDiffFilter.value, [0, 0, -1])

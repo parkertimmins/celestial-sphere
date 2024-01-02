@@ -380,7 +380,7 @@ function iosRenderOnOrientChange() {
                 }
                
                 const noHeadingAlert = document.getElementById("alert-container")
-                noHeaderAlert.style.display = state.bearingDiffFilter.value === null ? 'flex' : 'none';
+                noHeadingAlert.style.display = state.bearingDiffFilter.value === null ? 'flex' : 'none';
                 const angle = state.bearingDiffFilter.value || 0;
                 const northOffsetQuat = Quaternions.fromAngleAxis(angle, [0, 0, -1])
                 state.orientQuat = Quaternions.multiply(northOffsetQuat, relativeQuat)

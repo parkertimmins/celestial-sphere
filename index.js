@@ -372,20 +372,17 @@ function iosRenderOnOrientChange() {
                 const lenProjOnXy = Math.sqrt(northRotated[0]**2 + northRotated[1]**2)
                 const northRotatedAngleFromHorizon = Math.abs(atan2(northRotated[2], lenProjOnXy))
 
-                while (true) {
-                    if (backRotated[2] < 0 && northRotatedAngleFromHorizon < 80) {
-                        const thetaRelativeNorth = atan2(northRotated[1], northRotated[0])
-                        const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
-                        const bearingDiff = mod(event.webkitCompassHeading - bearingRelativeNorth, 360)
-                        state.bearingDiffFilter.update(bearingDiff)
-                    }
-                    if (state.bearingDiffFilter.value !== null) {
-                        break;
-                    }
-                    alert("Compass reading needed. Hold the phone horizontal to the ground, the click ok")
-                } 
-
-                const northOffsetQuat = Quaternions.fromAngleAxis(state.bearingDiffFilter.value, [0, 0, -1])
+                if (backRotated[2] < 0 && northRotatedAngleFromHorizon < 80) {
+                    const thetaRelativeNorth = atan2(northRotated[1], northRotated[0])
+                    const bearingRelativeNorth = thetaToAz(thetaRelativeNorth)
+                    const bearingDiff = mod(event.webkitCompassHeading - bearingRelativeNorth, 360)
+                    state.bearingDiffFilter.update(bearingDiff)
+                }
+               
+                const noHeadingAlert = document.getElementById("alert-container")
+                noHeaderAlert.style.display = state.bearingDiffFilter.value === null ? 'flex' : 'none';
+                const angle = state.bearingDiffFilter.value || 0;
+                const northOffsetQuat = Quaternions.fromAngleAxis(angle, [0, 0, -1])
                 state.orientQuat = Quaternions.multiply(northOffsetQuat, relativeQuat)
                 
                 render(state, ctx, canvas)

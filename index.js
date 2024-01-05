@@ -253,7 +253,7 @@ function computeBounds(longVisAngle) {
     return { xBase, yBase, xMax, xMin, yMax, yMin, sphereToPixScale, distToPlane }
 }
 
-function toCanvasCoords(jd, ra, dec, inverseOrientQuat, bounds) {
+function toCanvasCoords(jd, ra, dec, inverseOrientQuat, bounds, userLatLong) {
     const celestialLatLong = equitorialToLatLong(jd, {ra, dec})
     const { altitude, azimuth } = getAltAz(userLatLong, celestialLatLong)
     const vecOnSphere = to3Vec(altitude, azimuth)
@@ -274,7 +274,7 @@ function toCanvasCoords(jd, ra, dec, inverseOrientQuat, bounds) {
 
 function addObject(st, inverseOrientQuat, jd, eclipLatLong, drawFunc) {
     const {ra, dec} = eclipticToEquitorial(eclipLatLong)
-    const coords = toCanvasCoords(jd, ra, dec, inverseOrientQuat, st.bounds)
+    const coords = toCanvasCoords(jd, ra, dec, inverseOrientQuat, st.bounds, st.userLatLong)
     if (coords !== null) {
         drawFunc(st, ...coords)
     }
@@ -288,7 +288,7 @@ function render(st, ctx, canvas) {
     for (const star of stars) {
         let { name, mag, ra, dec } = star
         if (mag < minVisibleMag) {
-            const coords = toCanvasCoords(jd, ra, dec, inverseOrientQuat, st.bounds)
+            const coords = toCanvasCoords(jd, ra, dec, inverseOrientQuat, st.bounds, st.userLatLong)
             if (coords !== null) {
                 drawStar(st, name, mag, coords[0], coords[1])
             }
@@ -332,8 +332,6 @@ const planets = resolved[1]
 const earth = planets.filter((p) => p.name === "Earth")[0]
 const images = Object.fromEntries(objects.map((name, i) => [name, resolved[i+2]]))
 
-const userLoc = await getPosition()
-const userLatLong = { lat: userLoc.coords.latitude, long: toLongWest(userLoc.coords.longitude) }
 
 // Global mutable state
 const state = {} 
@@ -347,6 +345,8 @@ state.bearingDiffFilter = expAvgFilter(0.05)
 state.bounds = computeBounds(state.longVisAngle)
 // cache of pointer events for zooming 
 state.evCache = {}
+// lat/long of user
+state.userLatLong = {lat:0, long: 0}
 
 
 // All functions that access state object directly are below this point
@@ -404,14 +404,23 @@ function androidRenderOnOrientChange() {
     sensor.addEventListener("error", (error) => console.log(error));
 }
 
-// Render on orientation change
-if (/(iPad|iPhone)/g.test(navigator.userAgent)) {
-    const allowButton = document.getElementById("request-perms")
-    allowButton.style.display = 'block';
-    allowButton.onclick = iosRenderOnOrientChange;
-} else {
-    androidRenderOnOrientChange() 
+const isIOS = () => /(iPad|iPhone)/g.test(navigator.userAgent)
+const allowButton = document.getElementById("request-perms")
+allowButton.onclick = () => {
+    allowButton.style.display = 'none';
+
+    // start gps 
+    navigator.geolocation.watchPosition(pos => {
+        state.userLatLong = { lat: pos.coords.latitude, long: toLongWest(pos.coords.longitude) }
+    }, console.log);
+    
+    if (isIOS()) {
+        iosRenderOnOrientChange() 
+    } else {
+        androidRenderOnOrientChange() 
+    }   
 }
+
 
 // Render on zoom in/out
 // https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events/Pinch_zoom_gestures

@@ -1,3 +1,4 @@
+
 The 3 systems:
     1. latitude/longitude as we know them. Defining a point on earth itself. A given point spins with the earth.  
     2. right ascension/declination. Defining a point which is stuck to a sphere where earth is but which does not spin. Once a day, the gridlines of right ascension will line up with longitude, and declination with latitude.  
@@ -9,7 +10,6 @@ Equitorial Coordinate System
         - http://www.stargazing.net/kepler/ellipse.html#twig06
     
 
-
 Stars:
 - dont need to mess with ecliptic
 - get database of RA and DEC for stars
@@ -20,7 +20,6 @@ Stars:
 
 Convert to altitude and azimuth in the app
 https://people.ast.cam.ac.uk/~ioalib/convert.html
-
 https://www.aa.quae.nl/en/reken/zonpositie.html
 
 Moon
@@ -37,7 +36,6 @@ Sphere Image
     - get location from GPS
     - get current time
     - get current phone orientation 
-
 
     - Stars
         - old system computes users location from 
@@ -76,34 +74,46 @@ Sphere Image
 Images:
 
 Sun
-    https://photojournal.jpl.nasa.gov/catalog/PIA22242
+    Credit: NASA/GSFC/Solar Dynamics Observatory
+    Link: https://photojournal.jpl.nasa.gov/catalog/PIA22242
 
 Moon
-    https://photojournal.jpl.nasa.gov/catalog/PIA14011
+    Credit: NASA/GSFC/Arizona State University
+    Link: https://photojournal.jpl.nasa.gov/catalog/PIA14011
 
 Mercury
-    https://photojournal.jpl.nasa.gov/catalog/PIA16858
+    Credit: NASA/Johns Hopkins University Applied Physics Laboratory/Carnegie Institution of Washington
+    Link: https://photojournal.jpl.nasa.gov/catalog/PIA16858
+    Policy: https://messenger.jhuapl.edu/Explore/Usage-Statement.html
     
 Venus
-    https://photojournal.jpl.nasa.gov/catalog/PIA23791
+    Credit: NASA/JPL-Caltech
+    Link: https://photojournal.jpl.nasa.gov/catalog/PIA23791
 
 Jupiter
-    https://photojournal.jpl.nasa.gov/catalog/PIA02821
+    Credit: NASA/JPL/University of Arizona
+    Link: https://photojournal.jpl.nasa.gov/catalog/PIA02821
 
 Mars
-    https://photojournal.jpl.nasa.gov/catalog/PIA23515
+    Credit: NASA/JPL-Caltech
+    Link: https://photojournal.jpl.nasa.gov/catalog/PIA23515
 
 Saturn
-    https://photojournal.jpl.nasa.gov/catalog/PIA11141
+    Credit: NASA/JPL/Space Science Institute
+    Link: https://photojournal.jpl.nasa.gov/catalog/PIA11141
 
 Neptune
-    https://photojournal.jpl.nasa.gov/catalog/PIA02210 
+    Credit: NASA/JPL
+    Link: https://photojournal.jpl.nasa.gov/catalog/PIA02210 
 
 Uranus
-    https://photojournal.jpl.nasa.gov/catalog/PIA18182  
+    Credit: NASA/JPL-Caltech
+    Link: https://photojournal.jpl.nasa.gov/catalog/PIA18182  
 
 Pluto
-    https://photojournal.jpl.nasa.gov/catalog/PIA11709
+    Credit: NASA/Johns Hopkins University Applied Physics Laboratory/Southwest Research Institute
+    Link: https://photojournal.jpl.nasa.gov/catalog/PIA11709
+
 
 Photo Processing
     - layer -> transparency -> add alpha channel
@@ -135,7 +145,11 @@ https://math.stackexchange.com/questions/3412199/how-to-calculate-the-intersecti
 
 
 Todo:
-    - on iphone resample difference between relative and absolute heading 
+    - iphone avoid getting permissions multiple times
+    - iphone wrong direction if upside down (more specfically if 45 deg north vector goes below horizontal when screen is downward
+    - fix circular exp averaging
+    - handle orientation change?
+    - [x] on iphone resample difference between relative and absolute heading 
     - [x] fix http issues issues
     - add parallax?
     - fix jitter with 1 euro filter

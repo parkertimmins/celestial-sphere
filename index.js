@@ -351,8 +351,6 @@ state.userLatLong = {lat:0, long: 0}
 
 // All functions that access state object directly are below this point
 function iosRenderOnOrientChange() {
-
-    document.getElementById("request-perms").style.display = 'none';
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
       DeviceOrientationEvent.requestPermission(true)
         .then(permissionState => {
@@ -407,7 +405,7 @@ function androidRenderOnOrientChange() {
 const isIOS = () => /(iPad|iPhone)/g.test(navigator.userAgent)
 const allowButton = document.getElementById("request-perms")
 allowButton.onclick = () => {
-    allowButton.style.display = 'none';
+    document.getElementById("request-perms-container").style.display = 'none';
 
     // start gps 
     navigator.geolocation.watchPosition(pos => {

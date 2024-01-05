@@ -53,3 +53,21 @@ canvas {
     margin-right: 2em;
 }
 
+
+#footer {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    text-align: right;
+}
+
+a:link, a:visited {
+    font-size: 250%;
+    color: #060333;
+    background-color: #4c4c4c;
+    text-decoration: none;
+    -webkit-user-select: none;
+    user-select: none;
+    pointer-events: auto;
+}
+

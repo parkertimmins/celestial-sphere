@@ -206,11 +206,11 @@ const loadImage = (url) => new Promise((resolve, reject) => {
 const toPixelSize = (deg, st) => st.bounds.sphereToPixScale * rad(deg)
 const drawImgCentered = (ctx, img, x, y, size) => ctx.drawImage(img, x-size/2, y-size/2, size, size)
 
-function addTitle(st, ctx, x, y, text, color, font, pixSize) {
-    ctx.font = font;
+function addTitle(st, ctx, x, y, text, color, pixSize) {
+    ctx.font = '12pt Calibri';
     ctx.textAlign = "center";
     ctx.fillStyle = color;
-    const textPixOffset = pixSize / 2 + toPixelSize(1, st)
+    const textPixOffset = pixSize / 2 + toPixelSize(1, st);
     ctx.fillText(text, x, y + textPixOffset);
 }
 
@@ -221,13 +221,13 @@ function drawStar(st, name, mag, x, y) {
     ctx.arc(x, y, imgRadius, 0, 2 * Math.PI);
     ctx.fillStyle = 'white';
     ctx.fill();
-    addTitle(st, ctx, x, y, name, 'white', "20pt bold", imgRadius);
+    addTitle(st, ctx, x, y, name, 'white', imgRadius);
 }
 
 function drawMoon(st, x, y) {
     const pixSize = toPixelSize(2.5, st)
     drawImgCentered(ctx, images.Moon, x, y, pixSize)
-    addTitle(st, ctx, x, y, 'Moon', 'lightgreen', "20pt bold", pixSize);
+    addTitle(st, ctx, x, y, 'Moon', 'lightgreen', pixSize);
 }
 
 function drawSun(st, x, y) {

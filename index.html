@@ -1,16 +1,27 @@
 <html>
     <head>
+
         <link rel="stylesheet" href="index.css">
     </head>
     <body>
-        <button id="request-perms">Request Orientation Sensor Permission</button>
+        <button id="request-perms">
+            This webapp uses your location data and phone orientation data. If this is acceptable, click this button then give the app permission to access this data.
+        </button>
+
+         <!-- items always on the page -->
         <canvas id="canvas"></canvas>
         <script type="module" src="index.js"></script>
+        
+        <div id="footer">
+            <a href="https://github.com/parkertimmins/celestial-sphere/blob/main/README.md">About & Credits&nbsp;</a>
+        </div>
 
+        
         <div id="alert-container">
             <div id="no-heading-alert">
                 The compass can't find north. Hold your device flat and parallel to the ground until this message closes. You can then look in any direction.
             </div>
         </div>
+       
     </body>
 </html>

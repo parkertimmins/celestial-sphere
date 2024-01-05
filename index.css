@@ -56,7 +56,7 @@ canvas {
 
 #footer {
     position: fixed;
-    top: 0;
+    bottom: 0;
     width: 100%;
     text-align: right;
 }
@@ -64,7 +64,7 @@ canvas {
 a:link, a:visited {
     font-size: 250%;
     color: #060333;
-    background-color: #4c4c4c;
+    background-color: darkgrey;
     text-decoration: none;
     -webkit-user-select: none;
     user-select: none;

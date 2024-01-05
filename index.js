@@ -207,7 +207,7 @@ const toPixelSize = (deg, st) => st.bounds.sphereToPixScale * rad(deg)
 const drawImgCentered = (ctx, img, x, y, size) => ctx.drawImage(img, x-size/2, y-size/2, size, size)
 
 function addTitle(st, ctx, x, y, text, color, pixSize) {
-    ctx.font = '12pt Calibri';
+    ctx.font = '22pt Calibri';
     ctx.textAlign = "center";
     ctx.fillStyle = color;
     const textPixOffset = pixSize / 2 + toPixelSize(1, st);
@@ -233,13 +233,13 @@ function drawMoon(st, x, y) {
 function drawSun(st, x, y) {
     const pixSize = toPixelSize(2.5, st)
     drawImgCentered(ctx, images.Sun, x, y, pixSize) 
-    addTitle(st, ctx, x, y, 'Sun', 'white', "20pt bold", pixSize);
+    addTitle(st, ctx, x, y, 'Sun', 'white', pixSize);
 }
 
 function drawPlanet(st, p, x, y) {
     const pixSize = toPixelSize(p.imgSize, st)
     drawImgCentered(ctx, images[p.name], x, y, pixSize) 
-    addTitle(st, ctx, x, y, p.name, 'lightgreen', "20pt bold", pixSize);
+    addTitle(st, ctx, x, y, p.name, 'lightgreen', pixSize);
 }
 
 function computeBounds(longVisAngle) {

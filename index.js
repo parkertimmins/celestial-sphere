@@ -390,14 +390,11 @@ function iosRenderOnOrientChange() {
 }
 
 function androidRenderOnOrientChange() {
-    const options = { frequency: 30, referenceFrame: "device" };
-    const sensor = new AbsoluteOrientationSensor(options);
-    sensor.start();
-    sensor.addEventListener("reading", () => {
-        state.orientQuat = Quaternions.toInternalQuat(sensor.quaternion)
+    window.addEventListener("deviceorientationabsolute", (event) => {
+        console.log(event);
+        state.orientQuat = Quaternions.fromAngles(event.alpha, event.beta, event.gamma)
         render(state, ctx, canvas)
     });
-    sensor.addEventListener("error", (error) => console.log(error));
 }
 
 function setCanvasSize() {

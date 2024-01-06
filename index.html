@@ -4,25 +4,29 @@
         <link rel="stylesheet" href="index.css">
     </head>
     <body>
-        <!-- items always on the page -->
-        <canvas id="canvas"></canvas>
-        <script type="module" src="index.js"></script>
-        
-        <div id="footer">
-            <a href="https://github.com/parkertimmins/celestial-sphere/blob/main/README.md">About & Credits&nbsp;</a>
+        <!-- initial page is perm confirmation -->
+        <div id='request-perms-pane'>
+            <div id='message'>
+                Welcome to Celestial Sphere! This web app utilizes your device's location and orientation data to present an map of the stars and planets. To embark on this journey into the dome of the heavens, kindly click below then grant permission to access the required data.
+            </div>
+            <button id="request-perms">To Celestial Sphere</button>
         </div>
 
-        <div id="request-perms-container">
-            <button id="request-perms">
-                This webapp uses your location data and phone orientation data. If this is acceptable, click this button then give the app permission to access this data.
-            </button>
+        <!-- star map page has canvas and footer -->
+        <div id="star-pane">
+            <canvas id="canvas"></canvas>
+            <div id="footer">
+                <a href="https://github.com/parkertimmins/celestial-sphere/blob/main/README.md">About & Credits&nbsp;</a>
+            </div>
         </div>
 
+        <!-- alert container may show up on iphone -->
         <div id="alert-container">
             <div id="no-heading-alert">
                 The compass can't find north. Hold your device flat and parallel to the ground until this message closes. You can then look in any direction.
             </div>
         </div>
        
+        <script type="module" src="index.js"></script>
     </body>
 </html>

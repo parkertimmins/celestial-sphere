@@ -310,8 +310,6 @@ const minStarSize = (st) => toPixelSize(0.01, st)
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
 
 const brighestStarMag = -1.46           // sirius
 const minVisibleMag = 6               // dimmest magnitude shown
@@ -402,16 +400,24 @@ function androidRenderOnOrientChange() {
     sensor.addEventListener("error", (error) => console.log(error));
 }
 
+function setCanvasSize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    state.bounds = computeBounds(state.longVisAngle)
+}
+
 const isIOS = () => /(iPad|iPhone)/g.test(navigator.userAgent)
 const allowButton = document.getElementById("request-perms")
 allowButton.onclick = () => {
-    document.getElementById("request-perms-container").style.display = 'none';
+    document.getElementById("request-perms-pane").style.display = 'none';
+    document.getElementById("star-pane").style.display = 'block';
+    setCanvasSize();
 
     // start gps 
     navigator.geolocation.watchPosition(pos => {
         state.userLatLong = { lat: pos.coords.latitude, long: toLongWest(pos.coords.longitude) }
     }, console.log);
-    
+  
     if (isIOS()) {
         iosRenderOnOrientChange() 
     } else {
